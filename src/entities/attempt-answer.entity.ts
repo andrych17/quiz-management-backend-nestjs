@@ -6,32 +6,29 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { Attempt } from './attempt.entity';
 import { Question } from './question.entity';
+import { Attempt } from './attempt.entity';
 
 @Entity('attempt_answers')
 @Index(['attemptId', 'questionId'])
 export class AttemptAnswer {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column()
-  attemptId: string;
+  attemptId: number;
 
   @Column()
-  questionId: string;
+  questionId: number;
 
   @Column('text')
-  answerText: string;
+  answer: string;
 
-  @Column({ type: 'int', nullable: true })
-  selectedOption: number; // For single multiple choice answers
-
-  @Column('json', { nullable: true })
-  selectedOptions: number[]; // For multiple select answers
+  @Column({ default: false })
+  isCorrect: boolean;
 
   // Relations
-  @ManyToOne(() => Attempt, (attempt) => attempt.answers, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Attempt, 'answers', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'attemptId' })
   attempt: Attempt;
 

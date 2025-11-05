@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
-import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem } from '../entities';
-import { v4 as uuid } from 'uuid';
+import * as bcrypt from 'bcrypt';
+import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserLocation, QuizImage } from '../entities';
+import { ServiceType } from '../dto/quiz.dto';
 
 export class DatabaseSeeder {
   constructor(private dataSource: DataSource) {}
@@ -12,6 +13,7 @@ export class DatabaseSeeder {
     await this.seedConfigItems();
     await this.seedQuizzes();
     await this.seedAttempts();
+    await this.seedUserLocations();
 
     console.log('Database seeding completed!');
   }
@@ -19,12 +21,16 @@ export class DatabaseSeeder {
   private async seedUsers(): Promise<void> {
     const userRepository = this.dataSource.getRepository(User);
     
+    // Hash passwords
+    const saltRounds = 10;
+    const defaultPassword = await bcrypt.hash('password123', saltRounds);
+    
     const users = [
       {
-        id: uuid(),
         email: 'superadmin@gms.com',
         name: 'Super Admin GMS',
-        role: 'superadmin' as const,
+        password: defaultPassword,
+        role: 'admin' as const,
         createdAt: new Date('2024-01-01T00:00:00Z'),
         updatedAt: new Date('2025-08-15T10:30:00Z'),
         createdBy: 'system',
@@ -33,9 +39,9 @@ export class DatabaseSeeder {
         isActive: true,
       },
       {
-        id: uuid(),
         email: 'admin@gms.com',
         name: 'Admin GMS',
+        password: defaultPassword,
         role: 'admin' as const,
         createdAt: new Date('2024-01-02T00:00:00Z'),
         updatedAt: new Date('2025-08-16T11:00:00Z'),
@@ -45,21 +51,21 @@ export class DatabaseSeeder {
         isActive: true,
       },
       {
-        id: uuid(),
-        email: 'moderator@gms.com',
-        name: 'Moderator GMS',
-        role: 'admin' as const,
+        email: 'user@gms.com',
+        name: 'Regular User GMS',
+        password: defaultPassword,
+        role: 'user' as const,
         createdAt: new Date('2024-02-01T00:00:00Z'),
         updatedAt: new Date('2025-07-20T09:15:00Z'),
         createdBy: 'superadmin@gms.com',
-        updatedBy: 'moderator@gms.com',
+        updatedBy: 'user@gms.com',
         lastLogin: new Date('2025-08-29T08:30:00Z'),
         isActive: true,
       },
     ];
 
     await userRepository.save(users);
-    console.log(`✓ Seeded ${users.length} users`);
+    console.log(`✓ Seeded ${users.length} users with hashed passwords`);
   }
 
   private async seedConfigItems(): Promise<void> {
@@ -67,7 +73,6 @@ export class DatabaseSeeder {
     
     const configs = [
       {
-        id: uuid(),
         group: 'app',
         key: 'name',
         value: 'Logic Test GMS Church',
@@ -79,7 +84,6 @@ export class DatabaseSeeder {
         updatedAt: new Date('2024-01-01T00:00:00Z'),
       },
       {
-        id: uuid(),
         group: 'app',
         key: 'version',
         value: '1.0.0',
@@ -91,7 +95,6 @@ export class DatabaseSeeder {
         updatedAt: new Date('2024-01-01T00:00:00Z'),
       },
       {
-        id: uuid(),
         group: 'quiz',
         key: 'default_passing_score',
         value: '70',
@@ -103,12 +106,67 @@ export class DatabaseSeeder {
         updatedAt: new Date('2024-01-01T00:00:00Z'),
       },
       {
-        id: uuid(),
         group: 'quiz',
         key: 'default_questions_per_page',
         value: '5',
         description: 'Default number of questions per page',
         order: 2,
+        isActive: true,
+        createdBy: 'system',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+      },
+      // Location config items
+      {
+        group: 'location',
+        key: 'jakarta_pusat',
+        value: 'Jakarta Pusat',
+        description: 'Jakarta Central location',
+        order: 1,
+        isActive: true,
+        createdBy: 'system',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+      },
+      {
+        group: 'location',
+        key: 'jakarta_utara',
+        value: 'Jakarta Utara',
+        description: 'Jakarta North location',
+        order: 2,
+        isActive: true,
+        createdBy: 'system',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+      },
+      {
+        group: 'location',
+        key: 'jakarta_selatan',
+        value: 'Jakarta Selatan',
+        description: 'Jakarta South location',
+        order: 3,
+        isActive: true,
+        createdBy: 'system',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+      },
+      {
+        group: 'location',
+        key: 'jakarta_barat',
+        value: 'Jakarta Barat',
+        description: 'Jakarta West location',
+        order: 4,
+        isActive: true,
+        createdBy: 'system',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+      },
+      {
+        group: 'location',
+        key: 'jakarta_timur',
+        value: 'Jakarta Timur',
+        description: 'Jakarta East location',
+        order: 5,
         isActive: true,
         createdBy: 'system',
         createdAt: new Date('2024-01-01T00:00:00Z'),
@@ -120,29 +178,96 @@ export class DatabaseSeeder {
     console.log(`✓ Seeded ${configs.length} config items`);
   }
 
+  private async seedUserLocations(): Promise<void> {
+    const userLocationRepository = this.dataSource.getRepository(UserLocation);
+    const userRepository = this.dataSource.getRepository(User);
+    const configRepository = this.dataSource.getRepository(ConfigItem);
+    
+    // Get users and locations
+    const users = await userRepository.find();
+    const locations = await configRepository.find({ where: { group: 'location' } });
+    
+    if (users.length === 0 || locations.length === 0) {
+      console.log('❌ Users or locations not found for seeding user locations');
+      return;
+    }
+
+    const userLocations = [
+      {
+        userId: users[0].id, // superadmin@gms.com
+        locationId: locations.find(l => l.key === 'jakarta_pusat')?.id || locations[0].id,
+        isActive: true,
+        createdBy: 'system',
+      },
+      {
+        userId: users[1].id, // admin@gms.com
+        locationId: locations.find(l => l.key === 'jakarta_utara')?.id || locations[1].id,
+        isActive: true,
+        createdBy: 'system',
+      },
+      {
+        userId: users[2].id, // user@gms.com
+        locationId: locations.find(l => l.key === 'jakarta_selatan')?.id || locations[2].id,
+        isActive: true,
+        createdBy: 'system',
+      },
+    ];
+
+    await userLocationRepository.save(userLocations);
+    console.log(`✓ Seeded ${userLocations.length} user locations`);
+  }
+
   private async seedQuizzes(): Promise<void> {
     const quizRepository = this.dataSource.getRepository(Quiz);
     const questionRepository = this.dataSource.getRepository(Question);
+    const configRepository = this.dataSource.getRepository(ConfigItem);
+    
+    // Get locations
+    const locations = await configRepository.find({ where: { group: 'location' } });
+    const jakartaPusat = locations.find(l => l.key === 'jakarta_pusat');
+    const jakartaUtara = locations.find(l => l.key === 'jakarta_utara');
     
     // Quiz 1: Service Management
-    const smQuizId = uuid();
-    const smQuiz = {
-      id: smQuizId,
+    const smQuiz = quizRepository.create({
       title: 'Test Masuk Service Management Batch 1',
+      description: 'Test untuk seleksi masuk tim Service Management batch 1. Test ini mencakup pemahaman ITIL, service desk, dan manajemen layanan IT.',
       slug: 'test-sm-batch-1',
-      linkToken: 'sm-batch-1-2024',
+      token: 'sm-batch-1-2024',
+      serviceType: ServiceType.SERVICE_MANAGEMENT,
+      locationId: jakartaPusat?.id,
       isPublished: true,
       expiresAt: new Date('2025-08-30T23:59:59'),
-      passingScore: 7,
+      passingScore: 70,
       questionsPerPage: 5,
       createdBy: 'admin@gms.com',
       createdAt: new Date('2024-01-01T00:00:00Z'),
       updatedAt: new Date('2024-01-01T00:00:00Z'),
-    };
+    });
+
+    // Quiz 2: Network Management
+    const netQuiz = quizRepository.create({
+      title: 'Test Network Management Batch 2',
+      description: 'Test untuk seleksi masuk tim Network Management batch 2. Test ini mencakup pemahaman jaringan, protokol, dan troubleshooting.',
+      slug: 'test-network-batch-2',
+      token: 'network-batch-2-2024',
+      serviceType: ServiceType.NETWORK_MANAGEMENT,
+      locationId: jakartaUtara?.id,
+      isPublished: true,
+      expiresAt: new Date('2025-09-15T23:59:59'),
+      passingScore: 70,
+      questionsPerPage: 4,
+      createdBy: 'admin@gms.com',
+      createdAt: new Date('2024-01-15T00:00:00Z'),
+      updatedAt: new Date('2024-01-15T00:00:00Z'),
+    });
+
+    const savedSmQuiz = await quizRepository.save(smQuiz);
+    const savedNetQuiz = await quizRepository.save(netQuiz);
+    const smQuizId = savedSmQuiz.id;
+    const netQuizId = savedNetQuiz.id;
 
     const smQuestions = [
       {
-        id: uuid(),
         order: 1,
         questionText: 'Apa yang dimaksud dengan Service Management dalam konteks IT?',
         questionType: 'multiple-choice' as const,
@@ -156,7 +281,6 @@ export class DatabaseSeeder {
         quizId: smQuizId,
       },
       {
-        id: uuid(),
         order: 2,
         questionText: 'ITIL adalah framework yang digunakan dalam Service Management. Apa kepanjangan dari ITIL?',
         questionType: 'multiple-choice' as const,
@@ -170,7 +294,6 @@ export class DatabaseSeeder {
         quizId: smQuizId,
       },
       {
-        id: uuid(),
         order: 3,
         questionText: 'Manakah yang BUKAN termasuk dalam lifecycle ITIL v3?',
         questionType: 'multiple-choice' as const,
@@ -184,7 +307,6 @@ export class DatabaseSeeder {
         quizId: smQuizId,
       },
       {
-        id: uuid(),
         order: 4,
         questionText: 'Pilih semua database yang termasuk NoSQL:',
         questionType: 'multiple-select' as const,
@@ -200,7 +322,6 @@ export class DatabaseSeeder {
         quizId: smQuizId,
       },
       {
-        id: uuid(),
         order: 5,
         questionText: 'Pilih semua yang termasuk cloud service model:',
         questionType: 'multiple-select' as const,
@@ -217,25 +338,8 @@ export class DatabaseSeeder {
       },
     ];
 
-    // Quiz 2: Network Management
-    const netQuizId = uuid();
-    const netQuiz = {
-      id: netQuizId,
-      title: 'Test Network Management Batch 2',
-      slug: 'test-network-batch-2',
-      linkToken: 'network-batch-2-2024',
-      isPublished: true,
-      expiresAt: new Date('2025-09-15T23:59:59'),
-      passingScore: 6,
-      questionsPerPage: 4,
-      createdBy: 'admin@gms.com',
-      createdAt: new Date('2024-01-15T00:00:00Z'),
-      updatedAt: new Date('2024-01-15T00:00:00Z'),
-    };
-
     const netQuestions = [
       {
-        id: uuid(),
         order: 1,
         questionText: 'Apa itu Network Topology?',
         questionType: 'multiple-choice' as const,
@@ -249,7 +353,6 @@ export class DatabaseSeeder {
         quizId: netQuizId,
       },
       {
-        id: uuid(),
         order: 2,
         questionText: 'Manakah yang termasuk dalam OSI Layer?',
         questionType: 'multiple-select' as const,
@@ -265,7 +368,6 @@ export class DatabaseSeeder {
         quizId: netQuizId,
       },
       {
-        id: uuid(),
         order: 3,
         questionText: 'Apa fungsi utama dari Router?',
         questionType: 'text' as const,
@@ -274,7 +376,6 @@ export class DatabaseSeeder {
         quizId: netQuizId,
       },
       {
-        id: uuid(),
         order: 4,
         questionText: 'Port default untuk HTTP adalah?',
         questionType: 'multiple-choice' as const,
@@ -284,7 +385,6 @@ export class DatabaseSeeder {
       },
     ];
 
-    await quizRepository.save([smQuiz, netQuiz]);
     await questionRepository.save([...smQuestions, ...netQuestions]);
     
     console.log(`✓ Seeded 2 quizzes with ${smQuestions.length + netQuestions.length} questions`);
@@ -292,7 +392,6 @@ export class DatabaseSeeder {
 
   private async seedAttempts(): Promise<void> {
     const attemptRepository = this.dataSource.getRepository(Attempt);
-    const answerRepository = this.dataSource.getRepository(AttemptAnswer);
     const quizRepository = this.dataSource.getRepository(Quiz);
     
     const smQuiz = await quizRepository.findOne({ where: { slug: 'test-sm-batch-1' } });
@@ -305,27 +404,27 @@ export class DatabaseSeeder {
 
     const attempts = [
       {
-        id: uuid(),
         quizId: smQuiz.id,
         participantName: 'Ahmad Rizki Pratama',
+        email: 'ahmad.rizki@gms.com',
         nij: 'SM001',
         score: 8,
         passed: true,
         submittedAt: new Date('2025-08-20T14:30:00'),
       },
       {
-        id: uuid(),
         quizId: smQuiz.id,
         participantName: 'Sari Dewi Kusuma',
+        email: 'sari.dewi@gms.com',
         nij: 'SM002',
         score: 9,
         passed: true,
         submittedAt: new Date('2025-08-20T15:45:00'),
       },
       {
-        id: uuid(),
         quizId: netQuiz.id,
         participantName: 'Budi Santoso',
+        email: 'budi.santoso@gms.com',
         nij: 'NET001',
         score: 7,
         passed: true,

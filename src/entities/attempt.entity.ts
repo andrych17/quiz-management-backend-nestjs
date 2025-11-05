@@ -3,48 +3,64 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   OneToMany,
   JoinColumn,
   Index,
 } from 'typeorm';
 import { Quiz } from './quiz.entity';
-import { AttemptAnswer } from './attempt-answer.entity';
 
 @Entity('attempts')
-@Index(['quizId', 'nij'], { unique: true }) // Prevent duplicate attempts from same NIJ
+@Index(['quizId', 'email'], { unique: true }) // Prevent duplicate attempts from same email per quiz
 @Index(['quizId'])
-@Index(['submittedAt'])
+@Index(['email'])
+@Index(['nij'])
 export class Attempt {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column()
-  quizId: string;
+  quizId: number;
 
   @Column()
-  participantName: string;
+  participantName: string; // Nama peserta
 
   @Column()
-  nij: string; // NIJ (Nomor Induk Jemaat)
+  email: string; // Email peserta
+
+  @Column()
+  nij: string; // Nomor Induk Jemaat/NIJ
 
   @Column({ type: 'int', default: 0 })
   score: number;
 
   @Column({ default: false })
-  passed: boolean;
+  passed: boolean; // Apakah lulus berdasarkan passing score
 
   @CreateDateColumn()
+  startedAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  completedAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
   submittedAt: Date;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   // Relations
   @ManyToOne(() => Quiz, (quiz) => quiz.attempts, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'quizId' })
   quiz: Quiz;
 
-  @OneToMany(() => AttemptAnswer, (answer) => answer.attempt, {
+  @OneToMany('AttemptAnswer', 'attempt', {
     cascade: true,
-    eager: true,
+    eager: false,
   })
-  answers: AttemptAnswer[];
+  answers: any[];
 }

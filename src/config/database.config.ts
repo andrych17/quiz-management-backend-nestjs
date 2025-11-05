@@ -1,7 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem } from '../entities';
+import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserLocation, QuizImage } from '../entities';
 
 export const databaseConfig = registerAs(
   'database',
@@ -12,7 +12,7 @@ export const databaseConfig = registerAs(
     username: process.env.DATABASE_USERNAME || 'root',
     password: process.env.DATABASE_PASSWORD || '',
     database: process.env.DATABASE_NAME || 'quiz_db',
-    entities: [User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem],
+    entities: [User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserLocation, QuizImage],
     migrations: ['dist/migrations/*.js'],
     synchronize: process.env.DATABASE_SYNCHRONIZE === 'true' || false,
     logging: process.env.DATABASE_LOGGING === 'true' || false,

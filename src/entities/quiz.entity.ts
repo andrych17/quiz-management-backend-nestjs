@@ -4,30 +4,53 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
   OneToMany,
-  JoinColumn,
+  OneToOne,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
-import { User } from './user.entity';
-import { Question } from './question.entity';
-import { Attempt } from './attempt.entity';
+import { ConfigItem } from './config-item.entity';
+import { ServiceType } from '../dto/quiz.dto';
 
 @Entity('quizzes')
-@Index(['linkToken'], { unique: true })
+@Index(['token'], { unique: true })
 @Index(['slug'])
+@Index(['serviceType'])
+@Index(['locationId'])
 export class Quiz {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column()
   title: string;
+
+  @Column('text')
+  description: string;
 
   @Column({ nullable: true })
   slug: string;
 
   @Column({ unique: true })
-  linkToken: string;
+  token: string;
+
+  @Column({
+    type: 'enum',
+    enum: ServiceType,
+  })
+  serviceType: ServiceType; // Jenis pelayanan (e.g., 'service-management', 'network-management', 'database-admin', etc.)
+
+  @Column({ nullable: true })
+  locationId: number; // Assigned location dari config_items
+
+  @Column({ default: 70 })
+  passingScore: number; // Passing score dalam persen
+
+  @Column({ default: 5 })
+  questionsPerPage: number; // Jumlah pertanyaan per halaman
+
+  @Column({ default: true })
+  isActive: boolean;
 
   @Column({ default: false })
   isPublished: boolean;
@@ -35,14 +58,11 @@ export class Quiz {
   @Column({ type: 'timestamp', nullable: true })
   expiresAt: Date;
 
-  @Column({ default: 1 })
-  passingScore: number;
-
-  @Column({ default: 5 })
-  questionsPerPage: number;
-
-  @Column()
+  @Column({ nullable: true })
   createdBy: string;
+
+  @Column({ nullable: true })
+  updatedBy: string;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -51,19 +71,22 @@ export class Quiz {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => User, (user) => user.quizzes)
-  @JoinColumn({ name: 'createdBy', referencedColumnName: 'email' })
-  creator: User;
+  @ManyToOne(() => ConfigItem, { nullable: true })
+  @JoinColumn({ name: 'locationId' })
+  location: ConfigItem;
 
-  @OneToMany(() => Question, (question) => question.quiz, {
+  @OneToMany('Question', 'quiz', {
     cascade: true,
     eager: false,
   })
-  questions: Question[];
+  questions: any[];
 
-  @OneToMany(() => Attempt, (attempt) => attempt.quiz, {
+  @OneToMany('Attempt', 'quiz', {
     cascade: true,
     eager: false,
   })
-  attempts: Attempt[];
+  attempts: any[];
+
+  @OneToMany('QuizImage', 'quiz')
+  images: any[];
 }

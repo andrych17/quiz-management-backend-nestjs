@@ -21,14 +21,20 @@ Backend API for the Quiz Application built with NestJS, TypeORM, and MySQL.
 4. **Attempts** - User quiz submissions
 5. **AttemptAnswers** - Individual question answers
 6. **ConfigItems** - Application configuration
+7. **UserLocations** - User location assignments (references location config items)
+8. **QuizImages** - Quiz cover images (one-to-one with quizzes)
 
 ### Relationships
 
 - Users → Quizzes (1:many - creator relationship)
+- Users → UserLocations (1:1 - location assignment)
 - Quizzes → Questions (1:many)
 - Quizzes → Attempts (1:many)
+- Quizzes → QuizImages (1:1 - cover image)
 - Attempts → AttemptAnswers (1:many)
 - Questions → AttemptAnswers (1:many)
+- UserLocations → ConfigItems (many:1 - location reference)
+- ConfigItems → UserLocations (1:many - grouped by 'location')
 
 ## Setup
 
@@ -144,7 +150,8 @@ npm run migration:revert
 
 The seeder includes:
 - 3 default users (superadmin, admin, moderator)
-- 4 configuration items
+- 9 configuration items (app settings + 5 locations)
+- 3 user location assignments
 - 2 sample quizzes with questions
 - 3 sample attempts
 
@@ -165,7 +172,9 @@ src/
 │   ├── question.entity.ts
 │   ├── attempt.entity.ts
 │   ├── attempt-answer.entity.ts
-│   └── config-item.entity.ts
+│   ├── config-item.entity.ts
+│   ├── user-location.entity.ts
+│   └── quiz-image.entity.ts
 ├── migrations/       # Database migrations
 ├── seeds/           # Database seeders
 ├── app.module.ts    # Main application module

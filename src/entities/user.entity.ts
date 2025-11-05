@@ -5,13 +5,15 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
-import { Quiz } from './quiz.entity';
+import { Attempt } from './attempt.entity';
+import { UserLocation } from './user-location.entity';
 
 @Entity('users')
 export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column({ unique: true })
   email: string;
@@ -19,12 +21,15 @@ export class User {
   @Column()
   name: string;
 
+  @Column()
+  password: string;
+
   @Column({
     type: 'enum',
-    enum: ['admin', 'superadmin'],
-    default: 'admin',
+    enum: ['admin', 'user'],
+    default: 'user',
   })
-  role: 'admin' | 'superadmin';
+  role: 'admin' | 'user';
 
   @Column({ type: 'timestamp', nullable: true })
   lastLogin: Date;
@@ -45,6 +50,6 @@ export class User {
   updatedAt: Date;
 
   // Relations
-  @OneToMany(() => Quiz, (quiz) => quiz.creator)
-  quizzes: Quiz[];
+  @OneToOne(() => UserLocation, userLocation => userLocation.user)
+  location: UserLocation;
 }

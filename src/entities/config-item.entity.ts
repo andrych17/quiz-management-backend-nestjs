@@ -11,8 +11,8 @@ import {
 @Index(['group', 'key'], { unique: true })
 @Index(['group'])
 export class ConfigItem {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column()
   group: string;

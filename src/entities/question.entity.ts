@@ -2,46 +2,47 @@ import {
   Entity,
   Column,
   PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   OneToMany,
   JoinColumn,
   Index,
 } from 'typeorm';
 import { Quiz } from './quiz.entity';
-import { AttemptAnswer } from './attempt-answer.entity';
 
 @Entity('questions')
 @Index(['quizId', 'order'])
 export class Question {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column()
-  order: number;
+  quizId: number;
 
   @Column('text')
-  questionText: string;
+  question: string;
 
-  @Column({
-    type: 'enum',
-    enum: ['multiple-choice', 'multiple-select', 'text'],
-  })
-  questionType: 'multiple-choice' | 'multiple-select' | 'text';
-
-  @Column('json', { nullable: true })
+  @Column('json')
   options: string[];
 
   @Column()
   correctAnswer: string;
 
-  @Column()
-  quizId: string;
+  @Column({ default: 1 })
+  order: number;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   // Relations
   @ManyToOne(() => Quiz, (quiz) => quiz.questions, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'quizId' })
   quiz: Quiz;
 
-  @OneToMany(() => AttemptAnswer, (answer) => answer.question)
-  answers: AttemptAnswer[];
+  @OneToMany('AttemptAnswer', 'question')
+  answers: any[];
 }
