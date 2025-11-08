@@ -55,10 +55,20 @@ export class CreateQuizDto {
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiPropertyOptional({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz expiration date' })
+  @ApiPropertyOptional({ example: '2024-01-01T08:00:00.000Z', description: 'Quiz start date and time' })
   @IsOptional()
   @IsDateString()
-  expiresAt?: string;
+  startDateTime?: string;
+
+  @ApiPropertyOptional({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz end date and time' })
+  @IsOptional()
+  @IsDateString()
+  endDateTime?: string;
+
+  @ApiPropertyOptional({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing' })
+  @IsOptional()
+  @IsString()
+  quizLink?: string;
 }
 
 export class UpdateQuizDto {
@@ -112,10 +122,20 @@ export class UpdateQuizDto {
   @IsBoolean()
   isPublished?: boolean;
 
-  @ApiPropertyOptional({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz expiration date' })
+  @ApiPropertyOptional({ example: '2024-01-01T08:00:00.000Z', description: 'Quiz start date and time' })
   @IsOptional()
   @IsDateString()
-  expiresAt?: string;
+  startDateTime?: string;
+
+  @ApiPropertyOptional({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz end date and time' })
+  @IsOptional()
+  @IsDateString()
+  endDateTime?: string;
+
+  @ApiPropertyOptional({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing' })
+  @IsOptional()
+  @IsString()
+  quizLink?: string;
 }
 
 export class QuizResponseDto {
@@ -158,8 +178,14 @@ export class QuizResponseDto {
   @ApiProperty({ example: true, description: 'Whether the quiz is published' })
   isPublished: boolean;
 
-  @ApiProperty({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz expiration date' })
-  expiresAt: Date;
+  @ApiProperty({ example: '2024-01-01T08:00:00.000Z', description: 'Quiz start date and time' })
+  startDateTime: Date;
+
+  @ApiProperty({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz end date and time' })
+  endDateTime: Date;
+
+  @ApiProperty({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing' })
+  quizLink: string;
 
   @ApiProperty({ example: 'admin@gms.com', description: 'Creator email' })
   createdBy: string;

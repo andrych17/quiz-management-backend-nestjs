@@ -20,6 +20,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
+import { UrlShortenerService } from '../services/url-shortener.service';
 import { CreateQuizDto, UpdateQuizDto, QuizResponseDto } from '../dto/quiz.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
@@ -27,7 +28,10 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 @ApiTags('quizzes')
 @Controller('api/quizzes')
 export class QuizController {
-  constructor(private readonly quizService: QuizService) {}
+  constructor(
+    private readonly quizService: QuizService,
+    private readonly urlShortenerService: UrlShortenerService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -157,5 +161,60 @@ export class QuizController {
   })
   async unpublish(@Param('id', ParseIntPipe) id: number): Promise<QuizResponseDto> {
     return this.quizService.unpublish(id);
+  }
+
+  @Post(':id/generate-link')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Generate and update quiz link using TinyURL' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiQuery({ name: 'alias', required: false, type: String, description: 'Optional custom alias for the short URL' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Quiz link generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        token: { type: 'string' },
+        originalUrl: { type: 'string' },
+        shortUrl: { type: 'string' },
+        alias: { type: 'string' },
+      },
+    },
+  })
+  async generateLink(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('alias') alias?: string,
+  ): Promise<{
+    id: number;
+    token: string;
+    originalUrl: string;
+    shortUrl: string;
+    alias?: string;
+  }> {
+    // Get quiz details
+    const quiz = await this.quizService.findOne(id);
+    if (!quiz) {
+      throw new Error('Quiz not found');
+    }
+
+    // Generate the original URL
+    const originalUrl = this.urlShortenerService.generateQuizUrl(quiz.token);
+
+    // Create short URL with optional alias
+    const shortUrl = await this.urlShortenerService.shortenUrl(originalUrl, alias);
+
+    // Update the quiz with the new link
+    await this.quizService.update(id, { quizLink: shortUrl });
+
+    return {
+      id: quiz.id,
+      token: quiz.token,
+      originalUrl,
+      shortUrl,
+      alias: alias || undefined,
+    };
   }
 }

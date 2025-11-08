@@ -153,7 +153,13 @@ export class QuizService {
       slug: generateSlug(`${originalQuiz.title} (Copy)`),
       token: generateToken(),
       isActive: false, // Start as inactive
-      expiresAt: originalQuiz.expiresAt,
+      serviceType: originalQuiz.serviceType,
+      locationId: originalQuiz.locationId,
+      passingScore: originalQuiz.passingScore,
+      questionsPerPage: originalQuiz.questionsPerPage,
+      startDateTime: originalQuiz.startDateTime,
+      endDateTime: originalQuiz.endDateTime,
+      quizLink: `https://quiz.gms.com/q/${generateToken()}`, // Generate new link
     });
 
     const savedQuiz = await this.quizRepository.save(duplicatedQuiz);

@@ -56,7 +56,13 @@ export class Quiz {
   isPublished: boolean;
 
   @Column({ type: 'timestamp', nullable: true })
-  expiresAt: Date;
+  startDateTime: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  endDateTime: Date;
+
+  @Column({ nullable: true })
+  quizLink: string; // Short URL for public sharing
 
   @Column({ nullable: true })
   createdBy: string;
@@ -89,4 +95,10 @@ export class Quiz {
 
   @OneToMany('QuizImage', 'quiz')
   images: any[];
+
+  @OneToMany('QuizScoring', 'quiz', {
+    cascade: true,
+    eager: false,
+  })
+  scoringTemplates: any[];
 }
