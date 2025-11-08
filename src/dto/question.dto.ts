@@ -10,15 +10,25 @@ export class CreateQuestionDto {
   @ApiProperty({ example: 'What is the capital of France?', description: 'Question text' })
   @IsNotEmpty()
   @IsString()
-  question: string;
+  questionText: string;
 
   @ApiProperty({ 
-    example: ['Paris', 'London', 'Berlin', 'Madrid'], 
-    description: 'Array of possible answers' 
+    example: 'multiple-choice', 
+    description: 'Type of question',
+    enum: ['multiple-choice', 'multiple-select', 'text']
   })
+  @IsNotEmpty()
+  @IsString()
+  questionType: 'multiple-choice' | 'multiple-select' | 'text';
+
+  @ApiPropertyOptional({ 
+    example: ['Paris', 'London', 'Berlin', 'Madrid'], 
+    description: 'Array of possible answers (not required for text questions)' 
+  })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  options: string[];
+  options?: string[];
 
   @ApiProperty({ example: 'Paris', description: 'Correct answer' })
   @IsNotEmpty()
@@ -35,7 +45,16 @@ export class UpdateQuestionDto {
   @ApiPropertyOptional({ example: 'What is the capital of Italy?', description: 'Question text' })
   @IsOptional()
   @IsString()
-  question?: string;
+  questionText?: string;
+
+  @ApiPropertyOptional({ 
+    example: 'multiple-choice', 
+    description: 'Type of question',
+    enum: ['multiple-choice', 'multiple-select', 'text']
+  })
+  @IsOptional()
+  @IsString()
+  questionType?: 'multiple-choice' | 'multiple-select' | 'text';
 
   @ApiPropertyOptional({ 
     example: ['Rome', 'Milan', 'Naples', 'Turin'], 
@@ -65,7 +84,14 @@ export class QuestionResponseDto {
   quizId: number;
 
   @ApiProperty({ example: 'What is the capital of France?', description: 'Question text' })
-  question: string;
+  questionText: string;
+
+  @ApiProperty({ 
+    example: 'multiple-choice', 
+    description: 'Type of question',
+    enum: ['multiple-choice', 'multiple-select', 'text']
+  })
+  questionType: 'multiple-choice' | 'multiple-select' | 'text';
 
   @ApiProperty({ 
     example: ['Paris', 'London', 'Berlin', 'Madrid'], 

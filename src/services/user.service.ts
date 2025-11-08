@@ -51,7 +51,7 @@ export class UserService {
         if (location) {
           const userLocation = this.userLocationRepository.create({
             userId: savedUser.id,
-            configItemId: createUserDto.locationId,
+            locationId: createUserDto.locationId,
           });
           await this.userLocationRepository.save(userLocation);
         }
@@ -159,7 +159,7 @@ export class UserService {
         if (location) {
           const userLocation = this.userLocationRepository.create({
             userId: id,
-            configItemId: updateUserDto.locationId,
+            locationId: updateUserDto.locationId,
           });
           await this.userLocationRepository.save(userLocation);
         }

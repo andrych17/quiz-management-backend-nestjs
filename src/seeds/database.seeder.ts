@@ -21,6 +21,13 @@ export class DatabaseSeeder {
   private async seedUsers(): Promise<void> {
     const userRepository = this.dataSource.getRepository(User);
     
+    // Check if users already exist
+    const existingUsers = await userRepository.count();
+    if (existingUsers > 0) {
+      console.log(`✓ Users already exist (${existingUsers} users), skipping seeding`);
+      return;
+    }
+    
     // Hash passwords
     const saltRounds = 10;
     const defaultPassword = await bcrypt.hash('password123', saltRounds);
@@ -70,6 +77,13 @@ export class DatabaseSeeder {
 
   private async seedConfigItems(): Promise<void> {
     const configRepository = this.dataSource.getRepository(ConfigItem);
+    
+    // Check if config items already exist
+    const existingConfigs = await configRepository.count();
+    if (existingConfigs > 0) {
+      console.log(`✓ Config items already exist (${existingConfigs} items), skipping seeding`);
+      return;
+    }
     
     const configs = [
       {
@@ -183,6 +197,13 @@ export class DatabaseSeeder {
     const userRepository = this.dataSource.getRepository(User);
     const configRepository = this.dataSource.getRepository(ConfigItem);
     
+    // Check if user locations already exist
+    const existingUserLocations = await userLocationRepository.count();
+    if (existingUserLocations > 0) {
+      console.log(`✓ User locations already exist (${existingUserLocations} locations), skipping seeding`);
+      return;
+    }
+    
     // Get users and locations
     const users = await userRepository.find();
     const locations = await configRepository.find({ where: { group: 'location' } });
@@ -221,6 +242,13 @@ export class DatabaseSeeder {
     const quizRepository = this.dataSource.getRepository(Quiz);
     const questionRepository = this.dataSource.getRepository(Question);
     const configRepository = this.dataSource.getRepository(ConfigItem);
+    
+    // Check if quizzes already exist
+    const existingQuizzes = await quizRepository.count();
+    if (existingQuizzes > 0) {
+      console.log(`✓ Quizzes already exist (${existingQuizzes} quizzes), skipping seeding`);
+      return;
+    }
     
     // Get locations
     const locations = await configRepository.find({ where: { group: 'location' } });
@@ -393,6 +421,13 @@ export class DatabaseSeeder {
   private async seedAttempts(): Promise<void> {
     const attemptRepository = this.dataSource.getRepository(Attempt);
     const quizRepository = this.dataSource.getRepository(Quiz);
+    
+    // Check if attempts already exist
+    const existingAttempts = await attemptRepository.count();
+    if (existingAttempts > 0) {
+      console.log(`✓ Attempts already exist (${existingAttempts} attempts), skipping seeding`);
+      return;
+    }
     
     const smQuiz = await quizRepository.findOne({ where: { slug: 'test-sm-batch-1' } });
     const netQuiz = await quizRepository.findOne({ where: { slug: 'test-network-batch-2' } });

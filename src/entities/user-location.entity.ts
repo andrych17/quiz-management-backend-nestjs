@@ -13,7 +13,7 @@ import { ConfigItem } from './config-item.entity';
 
 @Entity('user_locations')
 @Index(['userId'], { unique: true }) // One location per user
-@Index(['configItemId'])
+@Index(['locationId'])
 export class UserLocation {
   @PrimaryGeneratedColumn()
   id: number;
@@ -22,7 +22,7 @@ export class UserLocation {
   userId: number;
 
   @Column()
-  configItemId: number; // References config_items with group 'location'
+  locationId: number; // References config_items with group 'location'
 
   @Column({ default: true })
   isActive: boolean;
@@ -45,6 +45,6 @@ export class UserLocation {
   user: User;
 
   @ManyToOne(() => ConfigItem, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'configItemId' })
-  configItem: ConfigItem;
+  @JoinColumn({ name: 'locationId' })
+  location: ConfigItem;
 }

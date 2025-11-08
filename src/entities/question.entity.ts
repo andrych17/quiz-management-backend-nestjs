@@ -21,9 +21,15 @@ export class Question {
   quizId: number;
 
   @Column('text')
-  question: string;
+  questionText: string;
 
-  @Column('json')
+  @Column({
+    type: 'enum',
+    enum: ['multiple-choice', 'multiple-select', 'text'],
+  })
+  questionType: 'multiple-choice' | 'multiple-select' | 'text';
+
+  @Column('jsonb', { nullable: true })
   options: string[];
 
   @Column()

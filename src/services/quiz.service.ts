@@ -162,7 +162,8 @@ export class QuizService {
     for (const question of originalQuiz.questions) {
       const duplicatedQuestion = this.questionRepository.create({
         quizId: savedQuiz.id,
-        question: question.question,
+        questionText: question.questionText,
+        questionType: question.questionType,
         options: question.options,
         correctAnswer: question.correctAnswer,
         order: question.order,
