@@ -49,6 +49,9 @@ export class Quiz {
   @Column({ default: 5 })
   questionsPerPage: number; // Jumlah pertanyaan per halaman
 
+  @Column({ type: 'int', nullable: true })
+  durationMinutes: number; // Duration in minutes (null = no time limit)
+
   @Column({ default: true })
   isActive: boolean;
 

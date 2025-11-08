@@ -50,6 +50,11 @@ export class CreateQuizDto {
   @IsNumber()
   questionsPerPage?: number;
 
+  @ApiPropertyOptional({ example: 120, description: 'Quiz duration in minutes (null = no time limit)' })
+  @IsOptional()
+  @IsNumber()
+  durationMinutes?: number;
+
   @ApiPropertyOptional({ example: true, description: 'Whether the quiz is active' })
   @IsOptional()
   @IsBoolean()
@@ -112,6 +117,11 @@ export class UpdateQuizDto {
   @IsNumber()
   questionsPerPage?: number;
 
+  @ApiPropertyOptional({ example: 90, description: 'Quiz duration in minutes (null = no time limit)' })
+  @IsOptional()
+  @IsNumber()
+  durationMinutes?: number;
+
   @ApiPropertyOptional({ example: false, description: 'Whether the quiz is active' })
   @IsOptional()
   @IsBoolean()
@@ -171,6 +181,9 @@ export class QuizResponseDto {
 
   @ApiProperty({ example: 5, description: 'Questions per page' })
   questionsPerPage: number;
+
+  @ApiPropertyOptional({ example: 120, description: 'Quiz duration in minutes (null = no time limit)' })
+  durationMinutes?: number;
 
   @ApiProperty({ example: true, description: 'Whether the quiz is active' })
   isActive: boolean;

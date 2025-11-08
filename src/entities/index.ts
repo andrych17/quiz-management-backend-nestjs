@@ -7,3 +7,4 @@ export { ConfigItem } from './config-item.entity';
 export { UserLocation } from './user-location.entity';
 export { QuizImage } from './quiz-image.entity';
 export { QuizScoring } from './quiz-scoring.entity';
+export { UserQuizSession } from './user-quiz-session.entity';
