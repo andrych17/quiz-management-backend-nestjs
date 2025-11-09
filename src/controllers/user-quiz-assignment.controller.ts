@@ -86,7 +86,7 @@ export class UserQuizAssignmentController {
     @Query('userId') userId?: number,
     @Query('quizId') quizId?: number,
     @Query('isActive') isActive?: boolean,
-  ): Promise<StdApiResponse<any>> {
+  ) {
     return this.userQuizAssignmentService.findAll(page, limit, userId, quizId, isActive);
   }
 
@@ -106,7 +106,7 @@ export class UserQuizAssignmentController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('isActive') isActive?: boolean,
-  ): Promise<StdApiResponse<any>> {
+  ) {
     return this.userQuizAssignmentService.findUserQuizzes(userId, page, limit, isActive);
   }
 
@@ -126,7 +126,7 @@ export class UserQuizAssignmentController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('isActive') isActive?: boolean,
-  ): Promise<StdApiResponse<any>> {
+  ) {
     return this.userQuizAssignmentService.findQuizUsers(quizId, page, limit, isActive);
   }
 

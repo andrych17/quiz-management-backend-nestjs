@@ -56,6 +56,11 @@ export class CreateQuizDto {
   @IsNumber()
   locationId?: number;
 
+  @ApiPropertyOptional({ example: 1, description: 'Service ID from config items (SM, AM, dll)' })
+  @IsOptional()
+  @IsNumber()
+  serviceId?: number;
+
   @ApiPropertyOptional({ example: 70, description: 'Passing score percentage (default: 70)' })
   @IsOptional()
   @IsNumber()
@@ -86,10 +91,43 @@ export class CreateQuizDto {
   @IsDateString()
   endDateTime?: string;
 
-  @ApiPropertyOptional({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing' })
+  @ApiPropertyOptional({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing (legacy)' })
   @IsOptional()
   @IsString()
   quizLink?: string;
+
+  @ApiPropertyOptional({ example: 'https://quiz.gms.com/quiz/javascript-basics-ABC123', description: 'Normal URL for quiz access' })
+  @IsOptional()
+  @IsString()
+  normalUrl?: string;
+
+  @ApiPropertyOptional({ example: 'https://tinyurl.com/quiz-js-basics', description: 'Short URL for easy sharing' })
+  @IsOptional()
+  @IsString()
+  shortUrl?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Quiz scoring templates to create',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        minScore: { type: 'number' },
+        maxScore: { type: 'number' },
+        grade: { type: 'string' },
+        description: { type: 'string' }
+      }
+    }
+  })
+  @IsOptional()
+  scoringTemplates?: Array<{
+    minScore: number;
+    maxScore: number;
+    grade: string;
+    description?: string;
+  }>;
+
+
 }
 
 export class UpdateQuizDto {
@@ -133,6 +171,11 @@ export class UpdateQuizDto {
   @IsNumber()
   locationId?: number;
 
+  @ApiPropertyOptional({ example: 1, description: 'Service ID from config items (SM, AM, dll)' })
+  @IsOptional()
+  @IsNumber()
+  serviceId?: number;
+
   @ApiPropertyOptional({ example: 70, description: 'Passing score percentage' })
   @IsOptional()
   @IsNumber()
@@ -168,10 +211,45 @@ export class UpdateQuizDto {
   @IsDateString()
   endDateTime?: string;
 
-  @ApiPropertyOptional({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing' })
+  @ApiPropertyOptional({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing (legacy)' })
   @IsOptional()
   @IsString()
   quizLink?: string;
+
+  @ApiPropertyOptional({ example: 'https://quiz.gms.com/quiz/javascript-advanced-XYZ789', description: 'Normal URL for quiz access' })
+  @IsOptional()
+  @IsString()
+  normalUrl?: string;
+
+  @ApiPropertyOptional({ example: 'https://tinyurl.com/quiz-js-advanced', description: 'Short URL for easy sharing' })
+  @IsOptional()
+  @IsString()
+  shortUrl?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Quiz scoring templates to update (will replace existing templates)',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        minScore: { type: 'number' },
+        maxScore: { type: 'number' },
+        grade: { type: 'string' },
+        description: { type: 'string' }
+      }
+    }
+  })
+  @IsOptional()
+  scoringTemplates?: Array<{
+    id?: number;
+    minScore: number;
+    maxScore: number;
+    grade: string;
+    description?: string;
+  }>;
+
+
 }
 
 export class QuizResponseDto {
@@ -205,6 +283,15 @@ export class QuizResponseDto {
   })
   location?: any;
 
+  @ApiPropertyOptional({ example: 1, description: 'Service ID' })
+  serviceId?: number;
+
+  @ApiPropertyOptional({ 
+    example: { id: 1, key: 'service_management', value: 'Service Management' }, 
+    description: 'Service details' 
+  })
+  service?: any;
+
   @ApiProperty({ example: 70, description: 'Passing score percentage' })
   passingScore: number;
 
@@ -226,8 +313,14 @@ export class QuizResponseDto {
   @ApiProperty({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz end date and time' })
   endDateTime: Date;
 
-  @ApiProperty({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing' })
+  @ApiProperty({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing (legacy)' })
   quizLink: string;
+
+  @ApiPropertyOptional({ example: 'https://quiz.gms.com/quiz/javascript-basics-ABC123', description: 'Normal URL for quiz access' })
+  normalUrl?: string;
+
+  @ApiPropertyOptional({ example: 'https://tinyurl.com/quiz-js-basics', description: 'Short URL for easy sharing' })
+  shortUrl?: string;
 
   @ApiProperty({ example: 'admin@gms.com', description: 'Creator email' })
   createdBy: string;
@@ -268,6 +361,45 @@ export class QuizResponseDto {
     }
   })
   scoringTemplates?: any[];
+}
+
+export class QuizDetailResponseDto extends QuizResponseDto {
+  @ApiPropertyOptional({ 
+    description: 'Quiz questions',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        questionText: { type: 'string' },
+        questionType: { type: 'string' },
+        isRequired: { type: 'boolean' },
+        order: { type: 'number' },
+        points: { type: 'number' },
+        options: { type: 'array' },
+        correctAnswers: { type: 'array' }
+      }
+    }
+  })
+  questions?: any[];
+
+  @ApiPropertyOptional({ 
+    description: 'Assigned users (auto-assigned based on service and location)',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        name: { type: 'string' },
+        email: { type: 'string' },
+        role: { type: 'string' },
+        assignedAt: { type: 'string', format: 'date-time' },
+        assignmentType: { type: 'string', description: 'Assignment type (auto/manual)' },
+        isActive: { type: 'boolean' }
+      }
+    }
+  })
+  assignedUsers?: any[];
 }
 
 export class StartManualQuizDto {

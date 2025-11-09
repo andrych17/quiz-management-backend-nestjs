@@ -42,6 +42,12 @@ export class User {
   @Column({ nullable: true })
   updatedBy: string;
 
+  @Column({ nullable: true })
+  locationId: number;
+
+  @Column({ nullable: true })
+  serviceId: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

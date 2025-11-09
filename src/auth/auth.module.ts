@@ -8,10 +8,7 @@ import { AuthService } from '../services/auth.service';
 import { AuthController } from '../controllers/auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
-import { UserService } from '../services/user.service';
-import { User } from '../entities/user.entity';
-import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
-import { ConfigItem } from '../entities/config-item.entity';
+import { SharedServicesModule } from '../shared/shared-services.module';
 
 @Module({
   imports: [
@@ -26,10 +23,10 @@ import { ConfigItem } from '../entities/config-item.entity';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([User, UserQuizAssignment, ConfigItem]),
+    SharedServicesModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, UserService, LocalStrategy, JwtStrategy],
+  providers: [AuthService, LocalStrategy, JwtStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

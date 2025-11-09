@@ -52,7 +52,7 @@ export class ConfigController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('group') group?: string,
-  ): Promise<StdApiResponse<any>> {
+  ) {
     return this.configService.findAll(page, limit, group);
   }
 

@@ -101,7 +101,7 @@ export class UserQuizAssignmentService {
     userId?: number,
     quizId?: number,
     isActive?: boolean,
-  ): Promise<ApiResponse<any>> {
+  ) {
     const skip = (page - 1) * limit;
     const whereCondition: any = {};
 
@@ -125,13 +125,19 @@ export class UserQuizAssignmentService {
       relations: ['user', 'quiz'],
     });
 
-    return ResponseFactory.paginated(
-      assignments,
-      total,
-      page,
-      limit,
-      'User-quiz assignments retrieved successfully'
-    );
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      items: assignments,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        pageSize: limit,
+        totalItems: total,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      }
+    };
   }
 
   async findUserQuizzes(
@@ -139,7 +145,7 @@ export class UserQuizAssignmentService {
     page: number = 1,
     limit: number = 10,
     isActive?: boolean,
-  ): Promise<ApiResponse<any>> {
+  ) {
     const skip = (page - 1) * limit;
     const whereCondition: any = { userId };
 
@@ -155,13 +161,19 @@ export class UserQuizAssignmentService {
       relations: ['quiz', 'quiz.questions', 'quiz.location'],
     });
 
-    return ResponseFactory.paginated(
-      assignments.map(assignment => assignment.quiz),
-      total,
-      page,
-      limit,
-      `Found ${total} quizzes assigned to user`
-    );
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      items: assignments.map(assignment => assignment.quiz),
+      pagination: {
+        currentPage: page,
+        totalPages,
+        pageSize: limit,
+        totalItems: total,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      }
+    };
   }
 
   async findQuizUsers(
@@ -169,7 +181,7 @@ export class UserQuizAssignmentService {
     page: number = 1,
     limit: number = 10,
     isActive?: boolean,
-  ): Promise<ApiResponse<any>> {
+  ) {
     const skip = (page - 1) * limit;
     const whereCondition: any = { quizId };
 
@@ -185,18 +197,24 @@ export class UserQuizAssignmentService {
       relations: ['user'],
     });
 
-    return ResponseFactory.paginated(
-      assignments.map(assignment => ({
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      items: assignments.map(assignment => ({
         assignmentId: assignment.id,
         assignedAt: assignment.createdAt,
         isActive: assignment.isActive,
         user: assignment.user
       })),
-      total,
-      page,
-      limit,
-      `Found ${total} users assigned to quiz`
-    );
+      pagination: {
+        currentPage: page,
+        totalPages,
+        pageSize: limit,
+        totalItems: total,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      }
+    };
   }
 
   async remove(id: number): Promise<void> {

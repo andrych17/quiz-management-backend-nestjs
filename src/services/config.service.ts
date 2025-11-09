@@ -37,7 +37,7 @@ export class ConfigService {
     }
   }
 
-  async findAll(page: number = 1, limit: number = 10, group?: string): Promise<ApiResponse<any>> {
+  async findAll(page: number = 1, limit: number = 10, group?: string) {
     const skip = (page - 1) * limit;
     const whereCondition: any = {};
 
@@ -52,13 +52,19 @@ export class ConfigService {
       order: { group: 'ASC', key: 'ASC' },
     });
 
-    return ResponseFactory.paginated(
-      configItems,
-      total,
-      page,
-      limit,
-      group ? `Found ${total} config items in group "${group}"` : 'Config items retrieved successfully'
-    );
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      items: configItems,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        pageSize: limit,
+        totalItems: total,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      }
+    };
   }
 
   async findOne(id: number): Promise<ConfigItemResponseDto> {

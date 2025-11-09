@@ -26,7 +26,6 @@ import { AttemptAnswerController } from './controllers/attempt-answer.controller
 import { UserQuizAssignmentController } from './controllers/user-quiz-assignment.controller';
 
 // Services
-import { UserService } from './services/user.service';
 import { QuizService } from './services/quiz.service';
 import { QuestionService } from './services/question.service';
 import { AttemptService } from './services/attempt.service';
@@ -35,6 +34,10 @@ import { UrlShortenerService } from './services/url-shortener.service';
 import { UserQuizSessionService } from './services/user-quiz-session.service';
 import { AttemptAnswerService } from './services/attempt-answer.service';
 import { UserQuizAssignmentService } from './services/user-quiz-assignment.service';
+import { UrlGeneratorService } from './services/url-generator.service';
+
+// Shared Services Module
+import { SharedServicesModule } from './shared/shared-services.module';
 
 // Auth Module
 import { AuthModule } from './auth/auth.module';
@@ -67,6 +70,7 @@ import { databaseConfig } from './config/database.config';
       QuizScoring,
       UserQuizSession,
     ]),
+    SharedServicesModule,
     AuthModule,
     ScheduleAppModule,
   ],
@@ -81,7 +85,6 @@ import { databaseConfig } from './config/database.config';
     UserQuizSessionController,
   ],
   providers: [
-    UserService,
     QuizService,
     QuestionService,
     AttemptService,
@@ -90,6 +93,7 @@ import { databaseConfig } from './config/database.config';
     AttemptAnswerService,
     UserQuizAssignmentService,
     UserQuizSessionService,
+    UrlGeneratorService,
   ],
 })
 export class AppModule {}

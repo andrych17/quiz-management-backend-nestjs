@@ -23,6 +23,7 @@ export enum QuizType {
 @Index(['slug'])
 @Index(['serviceType'])
 @Index(['locationId'])
+@Index(['serviceId'])
 export class Quiz {
   @PrimaryGeneratedColumn()
   id: number;
@@ -56,6 +57,9 @@ export class Quiz {
   @Column({ nullable: true })
   locationId: number; // Assigned location dari config_items
 
+  @Column({ nullable: true })
+  serviceId: number; // Assigned service dari config_items (SM, AM, dll)
+
   @Column({ default: 70 })
   passingScore: number; // Passing score dalam persen
 
@@ -78,7 +82,13 @@ export class Quiz {
   endDateTime: Date;
 
   @Column({ nullable: true })
-  quizLink: string; // Short URL for public sharing
+  quizLink: string; // Short URL for public sharing (legacy field)
+
+  @Column({ nullable: true })
+  normalUrl: string; // Normal URL for quiz access
+
+  @Column({ nullable: true })
+  shortUrl: string; // Shortened URL for easy sharing
 
   @Column({ nullable: true })
   createdBy: string;
@@ -97,6 +107,10 @@ export class Quiz {
   @JoinColumn({ name: 'locationId' })
   location: ConfigItem;
 
+  @ManyToOne(() => ConfigItem, { nullable: true })
+  @JoinColumn({ name: 'serviceId' })
+  service: ConfigItem;
+
   @OneToMany('Question', 'quiz', {
     cascade: true,
     eager: false,
@@ -108,9 +122,6 @@ export class Quiz {
     eager: false,
   })
   attempts: any[];
-
-  @OneToMany('QuizImage', 'quiz')
-  images: any[];
 
   @OneToMany('QuizScoring', 'quiz', {
     cascade: true,

@@ -18,7 +18,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { QuestionService } from '../services/question.service';
-import { CreateQuestionDto, UpdateQuestionDto, QuestionResponseDto } from '../dto/question.dto';
+import { CreateQuestionDto, UpdateQuestionDto, QuestionResponseDto, QuestionDetailResponseDto } from '../dto/question.dto';
 import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
 
 @ApiTags('questions')
@@ -27,13 +27,13 @@ export class QuestionController {
   constructor(private readonly questionService: QuestionService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new question' })
+  @ApiOperation({ summary: 'Create a new question with images' })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: 'Question created successfully',
-    type: QuestionResponseDto,
+    description: 'Question created successfully with images',
+    type: QuestionDetailResponseDto,
   })
-  async create(@Body() createQuestionDto: CreateQuestionDto): Promise<QuestionResponseDto> {
+  async create(@Body() createQuestionDto: CreateQuestionDto): Promise<QuestionDetailResponseDto> {
     return this.questionService.create(createQuestionDto);
   }
 
@@ -56,29 +56,29 @@ export class QuestionController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get question by ID' })
+  @ApiOperation({ summary: 'Get question by ID with images' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Question retrieved successfully',
-    type: QuestionResponseDto,
+    description: 'Question retrieved successfully with images',
+    type: QuestionDetailResponseDto,
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<QuestionResponseDto> {
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<QuestionDetailResponseDto> {
     return this.questionService.findOne(id);
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Update question by ID' })
+  @ApiOperation({ summary: 'Update question by ID with images' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Question updated successfully',
-    type: QuestionResponseDto,
+    description: 'Question updated successfully with images',
+    type: QuestionDetailResponseDto,
   })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateQuestionDto: UpdateQuestionDto,
-  ): Promise<QuestionResponseDto> {
+  ): Promise<QuestionDetailResponseDto> {
     return this.questionService.update(id, updateQuestionDto);
   }
 

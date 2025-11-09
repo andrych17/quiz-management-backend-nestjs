@@ -39,6 +39,31 @@ export class CreateQuestionDto {
   @IsOptional()
   @IsNumber()
   order?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Question images to create',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        fileName: { type: 'string' },
+        originalName: { type: 'string' },
+        mimeType: { type: 'string' },
+        fileSize: { type: 'number' },
+        filePath: { type: 'string' },
+        altText: { type: 'string' }
+      }
+    }
+  })
+  @IsOptional()
+  images?: Array<{
+    fileName: string;
+    originalName: string;
+    mimeType: string;
+    fileSize: number;
+    filePath: string;
+    altText?: string;
+  }>;
 }
 
 export class UpdateQuestionDto {
@@ -74,6 +99,33 @@ export class UpdateQuestionDto {
   @IsOptional()
   @IsNumber()
   order?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Question images to update (will replace existing images)',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        fileName: { type: 'string' },
+        originalName: { type: 'string' },
+        mimeType: { type: 'string' },
+        fileSize: { type: 'number' },
+        filePath: { type: 'string' },
+        altText: { type: 'string' }
+      }
+    }
+  })
+  @IsOptional()
+  images?: Array<{
+    id?: number;
+    fileName: string;
+    originalName: string;
+    mimeType: string;
+    fileSize: number;
+    filePath: string;
+    altText?: string;
+  }>;
 }
 
 export class QuestionResponseDto {
@@ -110,4 +162,26 @@ export class QuestionResponseDto {
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Last update date' })
   updatedAt: Date;
+}
+
+export class QuestionDetailResponseDto extends QuestionResponseDto {
+  @ApiPropertyOptional({ 
+    description: 'Question images',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        fileName: { type: 'string' },
+        originalName: { type: 'string' },
+        mimeType: { type: 'string' },
+        fileSize: { type: 'number' },
+        filePath: { type: 'string' },
+        altText: { type: 'string' },
+        isActive: { type: 'boolean' },
+        createdAt: { type: 'string', format: 'date-time' }
+      }
+    }
+  })
+  images?: any[];
 }

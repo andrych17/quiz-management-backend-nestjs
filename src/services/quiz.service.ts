@@ -6,11 +6,12 @@ import { Question } from '../entities/question.entity';
 import { QuizImage } from '../entities/quiz-image.entity';
 import { QuizScoring } from '../entities/quiz-scoring.entity';
 import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
-import { CreateQuizDto, UpdateQuizDto, QuizResponseDto, ServiceType, StartManualQuizDto } from '../dto/quiz.dto';
+import { CreateQuizDto, UpdateQuizDto, QuizResponseDto, QuizDetailResponseDto, ServiceType, StartManualQuizDto } from '../dto/quiz.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import { APP_URLS } from '../constants/app.constants';
 import { generateSlug, generateToken } from '../lib/utils';
-import { ApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
+import { UrlGeneratorService } from './url-generator.service';
+import { AutoAssignmentService } from './auto-assignment.service';
 
 @Injectable()
 export class QuizService {
@@ -25,6 +26,8 @@ export class QuizService {
     private readonly quizScoringRepository: Repository<QuizScoring>,
     @InjectRepository(UserQuizAssignment)
     private readonly userQuizAssignmentRepository: Repository<UserQuizAssignment>,
+    private readonly urlGeneratorService: UrlGeneratorService,
+    private readonly autoAssignmentService: AutoAssignmentService,
   ) {}
 
   // Helper method to get full image URL from file server
@@ -34,7 +37,7 @@ export class QuizService {
     return `${APP_URLS.FILE_SERVER_URL}/${filePath}`;
   }
 
-  async create(createQuizDto: CreateQuizDto): Promise<QuizResponseDto> {
+  async create(createQuizDto: CreateQuizDto): Promise<QuizDetailResponseDto> {
     try {
       const slug = generateSlug(createQuizDto.title);
       const token = generateToken();
@@ -56,16 +59,97 @@ export class QuizService {
       }
 
       const quiz = this.quizRepository.create({
-        ...createQuizDto,
+        title: createQuizDto.title,
+        description: createQuizDto.description,
+        serviceType: createQuizDto.serviceType,
         slug,
         token,
         quizType,
+        locationId: createQuizDto.locationId,
+        serviceId: createQuizDto.serviceId,
+        passingScore: createQuizDto.passingScore,
+        questionsPerPage: createQuizDto.questionsPerPage,
+        durationMinutes: createQuizDto.durationMinutes,
         isActive: createQuizDto.isActive ?? true,
-        isPublished: quizType === QuizType.SCHEDULED, // Auto-publish scheduled quizzes
+        isPublished: quizType === QuizType.SCHEDULED,
+        startDateTime: createQuizDto.startDateTime ? new Date(createQuizDto.startDateTime) : null,
+        endDateTime: createQuizDto.endDateTime ? new Date(createQuizDto.endDateTime) : null,
+        quizLink: createQuizDto.quizLink,
       });
 
       const savedQuiz = await this.quizRepository.save(quiz);
-      return savedQuiz as QuizResponseDto;
+
+      // Generate URLs for the quiz
+      if (savedQuiz.slug && savedQuiz.token) {
+        const urlAlias = this.urlGeneratorService.generateUrlAlias(savedQuiz.title);
+        const urls = await this.urlGeneratorService.generateQuizUrls(
+          savedQuiz.slug, 
+          savedQuiz.token, 
+          urlAlias
+        );
+        
+        // Update quiz with generated URLs
+        await this.quizRepository.update(savedQuiz.id, {
+          normalUrl: urls.normalUrl,
+          shortUrl: urls.shortUrl,
+        });
+        
+        savedQuiz.normalUrl = urls.normalUrl;
+        savedQuiz.shortUrl = urls.shortUrl;
+      }
+
+      // Auto-assign admin users based on service and location
+      if (savedQuiz.serviceId || savedQuiz.locationId) {
+        await this.autoAssignmentService.autoAssignUsersToQuiz(
+          savedQuiz.id, 
+          savedQuiz.serviceId,
+          savedQuiz.locationId, 
+          'system'
+        );
+      }
+
+      // Handle scoring templates
+      let savedScoringTemplates = [];
+      if (createQuizDto.scoringTemplates && createQuizDto.scoringTemplates.length > 0) {
+        const scoringTemplates = createQuizDto.scoringTemplates.map(templateData =>
+          this.quizScoringRepository.create({
+            quizId: savedQuiz.id,
+            scoringName: templateData.grade || 'Default Template',
+            correctAnswerPoints: templateData.maxScore || 10,
+            incorrectAnswerPenalty: 0,
+            unansweredPenalty: 0,
+            bonusPoints: 0,
+            multiplier: 1.0,
+            timeBonusEnabled: false,
+            isActive: true,
+          })
+        );
+        savedScoringTemplates = await this.quizScoringRepository.save(scoringTemplates);
+      }
+
+      // Get auto-assigned users
+      const users = await this.userQuizAssignmentRepository.find({
+        where: { quizId: savedQuiz.id, isActive: true },
+        relations: ['user'],
+      });
+      
+      const assignedUsers = users.map(assignment => ({
+        id: assignment.user.id,
+        name: assignment.user.name,
+        email: assignment.user.email,
+        role: assignment.user.role,
+        assignedAt: assignment.createdAt,
+        assignmentType: assignment.assignedBy === 'system' ? 'auto' : 'manual',
+        isActive: assignment.isActive,
+      }));
+
+      return {
+        ...savedQuiz,
+        questions: [],
+        images: [], // Images are now handled at question level
+        scoringTemplates: savedScoringTemplates,
+        assignedUsers,
+      } as QuizDetailResponseDto;
     } catch (error) {
       throw new BadRequestException(ERROR_MESSAGES.DATABASE_ERROR);
     }
@@ -76,7 +160,7 @@ export class QuizService {
     limit: number = 10,
     search?: string,
     isActive?: boolean,
-  ): Promise<ApiResponse<any>> {
+  ) {
     const skip = (page - 1) * limit;
     const whereCondition: any = {};
 
@@ -93,25 +177,28 @@ export class QuizService {
       skip,
       take: limit,
       order: { createdAt: 'DESC' },
-      relations: ['questions', 'attempts', 'images', 'scoringTemplates'],
+      relations: ['questions', 'attempts', 'scoringTemplates'],
     });
 
-    // Transform images to include full URLs for all quizzes
+    // Images are now at question level
     const transformedQuizzes = quizzes.map(quiz => ({
       ...quiz,
-      images: quiz.images?.map(image => ({
-        ...image,
-        fullUrl: this.getFullImageUrl(image.filePath),
-      })) || []
+      images: []
     }));
 
-    return ResponseFactory.paginated(
-      transformedQuizzes,
-      total,
-      page,
-      limit,
-      search ? `Found ${total} quizzes matching "${search}"` : 'Quizzes retrieved successfully'
-    );
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      items: transformedQuizzes,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        pageSize: limit,
+        totalItems: total,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      }
+    };
   }
 
   async findAllForUser(
@@ -121,7 +208,7 @@ export class QuizService {
     limit: number = 10,
     search?: string,
     isActive?: boolean,
-  ): Promise<ApiResponse<any>> {
+  ) {
     const skip = (page - 1) * limit;
     
     // Build query based on user role
@@ -129,7 +216,6 @@ export class QuizService {
       .createQueryBuilder('quiz')
       .leftJoinAndSelect('quiz.questions', 'questions')
       .leftJoinAndSelect('quiz.attempts', 'attempts')
-      .leftJoinAndSelect('quiz.images', 'images')
       .leftJoinAndSelect('quiz.scoringTemplates', 'scoringTemplates');
 
     // Superadmin sees all quizzes
@@ -165,58 +251,118 @@ export class QuizService {
       .take(limit)
       .getManyAndCount();
 
-    // Transform images to include full URLs for all quizzes
+    // Images are now at question level
     const transformedQuizzes = quizzes.map(quiz => ({
       ...quiz,
-      images: quiz.images?.map(image => ({
-        ...image,
-        fullUrl: this.getFullImageUrl(image.filePath),
-      })) || []
+      images: []
     }));
 
-    return ResponseFactory.paginated(
-      transformedQuizzes,
-      total,
-      page,
-      limit,
-      search ? `Found ${total} quizzes matching "${search}"` : 'Quizzes retrieved successfully'
-    );
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      items: transformedQuizzes,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        pageSize: limit,
+        totalItems: total,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      }
+    };
   }
 
-  async findOne(id: number): Promise<QuizResponseDto> {
+  async findOne(id: number): Promise<QuizDetailResponseDto> {
     const quiz = await this.quizRepository.findOne({
       where: { id },
-      relations: ['questions', 'attempts', 'images', 'scoringTemplates'],
     });
 
     if (!quiz) {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    // Transform images to include full URLs
-    if (quiz.images && quiz.images.length > 0) {
-      quiz.images = quiz.images.map(image => ({
-        ...image,
-        fullUrl: this.getFullImageUrl(image.filePath),
-      }));
-    }
+    // Get assigned users (admins who can access this quiz)
+    const assignments = await this.userQuizAssignmentRepository.find({
+      where: { quizId: id, isActive: true },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+    });
 
-    return quiz as QuizResponseDto;
+    const assignedUsers = assignments.map(assignment => ({
+      id: assignment.user.id,
+      name: assignment.user.name,
+      email: assignment.user.email,
+      role: assignment.user.role,
+      assignedAt: assignment.createdAt,
+      isActive: assignment.isActive,
+    }));
+
+    // Transform questions to include options and correct answers
+    const questions = quiz.questions ? quiz.questions.map(question => ({
+      id: question.id,
+      questionText: question.questionText,
+      questionType: question.questionType,
+      isRequired: question.isRequired,
+      order: question.order,
+      points: question.points,
+      options: question.options,
+      correctAnswers: question.correctAnswers,
+    })) : [];
+
+    return {
+      ...quiz,
+      questions,
+      assignedUsers,
+    } as QuizDetailResponseDto;
   }
 
-  async update(id: number, updateQuizDto: UpdateQuizDto): Promise<QuizResponseDto> {
+  async update(id: number, updateQuizDto: UpdateQuizDto): Promise<QuizDetailResponseDto> {
     const quiz = await this.quizRepository.findOne({ where: { id } });
 
     if (!quiz) {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
+    // Prepare update data excluding relational fields
+    const {scoringTemplates, ...quizData} = updateQuizDto;
+
     // Update slug if title is changed
     if (updateQuizDto.title && updateQuizDto.title !== quiz.title) {
-      updateQuizDto.slug = generateSlug(updateQuizDto.title);
+      quizData.slug = generateSlug(updateQuizDto.title);
     }
 
-    await this.quizRepository.update(id, updateQuizDto);
+    // Update quiz basic data
+    await this.quizRepository.update(id, quizData);
+
+
+
+    // Handle scoring templates update
+    if (scoringTemplates !== undefined) {
+      // Delete existing scoring templates
+      await this.quizScoringRepository.delete({ quizId: id });
+      
+      // Create new scoring templates if provided
+      if (scoringTemplates.length > 0) {
+        const newScoringTemplates = scoringTemplates.map(templateData =>
+          this.quizScoringRepository.create({
+            quizId: id,
+            scoringName: templateData.grade || 'Updated Template',
+            correctAnswerPoints: templateData.maxScore || 10,
+            incorrectAnswerPenalty: 0,
+            unansweredPenalty: 0,
+            bonusPoints: 0,
+            multiplier: 1.0,
+            timeBonusEnabled: false,
+            isActive: true,
+          })
+        );
+        await this.quizScoringRepository.save(newScoringTemplates);
+      }
+    }
+
+    // Auto-assignment will be triggered automatically by service/location changes
+    // No manual assignment handling needed since we use auto-assignment only
+
     return this.findOne(id);
   }
 
@@ -308,8 +454,62 @@ export class QuizService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    await this.quizRepository.update(id, { isActive: true });
+    // Generate URLs when publishing (same as generate link)
+    let updateData: any = { 
+      isPublished: true, 
+      isActive: true 
+    };
+
+    // Generate URLs if not already generated
+    if (!quiz.normalUrl || !quiz.shortUrl) {
+      if (quiz.slug && quiz.token) {
+        const urlAlias = this.urlGeneratorService.generateUrlAlias(quiz.title);
+        const urls = await this.urlGeneratorService.generateQuizUrls(
+          quiz.slug, 
+          quiz.token, 
+          urlAlias
+        );
+        
+        updateData.normalUrl = urls.normalUrl;
+        updateData.shortUrl = urls.shortUrl;
+      }
+    }
+
+    await this.quizRepository.update(id, updateData);
     return this.findOne(id);
+  }
+
+  async generateLink(id: number): Promise<{
+    normalUrl: string;
+    shortUrl: string;
+  }> {
+    const quiz = await this.quizRepository.findOne({ where: { id } });
+
+    if (!quiz) {
+      throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
+    }
+
+    // Generate URLs
+    if (quiz.slug && quiz.token) {
+      const urlAlias = this.urlGeneratorService.generateUrlAlias(quiz.title);
+      const urls = await this.urlGeneratorService.generateQuizUrls(
+        quiz.slug, 
+        quiz.token, 
+        urlAlias
+      );
+      
+      // Update quiz with generated URLs and publish it
+      await this.quizRepository.update(id, {
+        normalUrl: urls.normalUrl,
+        shortUrl: urls.shortUrl,
+        isPublished: true,
+        isActive: true,
+      });
+      
+      return urls;
+    } else {
+      throw new BadRequestException('Quiz must have slug and token to generate link');
+    }
   }
 
   async unpublish(id: number): Promise<QuizResponseDto> {
@@ -319,7 +519,7 @@ export class QuizService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    await this.quizRepository.update(id, { isActive: false });
+    await this.quizRepository.update(id, { isPublished: false, isActive: false });
     return this.findOne(id);
   }
 
@@ -396,7 +596,7 @@ export class QuizService {
     limit: number = 10,
     search?: string,
     serviceType?: ServiceType,
-  ): Promise<ApiResponse<any>> {
+  ) {
     const skip = (page - 1) * limit;
     const whereCondition: any = {
       isPublished: true, // Only published quizzes can be used as templates
@@ -418,15 +618,19 @@ export class QuizService {
       relations: ['questions', 'images', 'scoringTemplates'],
     });
 
-    return ResponseFactory.paginated(
-      quizzes,
-      total,
-      page,
-      limit,
-      search 
-        ? `Found ${total} quiz templates matching "${search}"` 
-        : 'Quiz templates retrieved successfully'
-    );
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      items: quizzes,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        pageSize: limit,
+        totalItems: total,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      }
+    };
   }
 
   async getQuizTemplatePreview(id: number) {
@@ -448,7 +652,7 @@ export class QuizService {
       ...quiz,
       statistics: {
         totalQuestions: quiz.questions?.length || 0,
-        totalImages: quiz.images?.length || 0,
+        totalImages: 0, // Images are now at question level
         scoringRulesCount: quiz.scoringTemplates?.length || 0,
         hasTimeLimit: !!quiz.durationMinutes,
       },
@@ -515,22 +719,7 @@ export class QuizService {
         await this.questionRepository.save(copiedQuestions);
       }
 
-      // Copy images (if any) - Create references pointing to external file server
-      if (sourceQuiz.images && sourceQuiz.images.length > 0) {
-        const copiedImages = sourceQuiz.images.map(image =>
-          this.quizImageRepository.create({
-            quizId: savedQuiz.id,
-            fileName: image.fileName,
-            originalName: `${image.originalName} (Copy)`,
-            mimeType: image.mimeType,
-            fileSize: image.fileSize,
-            filePath: image.filePath, // Keep same path for external file server
-            altText: image.altText,
-            isActive: true,
-          })
-        );
-        await this.quizImageRepository.save(copiedImages);
-      }
+      // Images are now handled at question level during question creation
       
       // TODO: Copy scoring templates (if any) - Based on current QuizScoring entity structure
       if (sourceQuiz.scoringTemplates && sourceQuiz.scoringTemplates.length > 0) {
@@ -635,13 +824,10 @@ export class QuizService {
       }
     }
 
-    // Transform images to include full URLs
+    // Images are now handled at question level
     const transformedQuiz = {
       ...quiz,
-      images: quiz.images?.map(image => ({
-        ...image,
-        fullUrl: this.getFullImageUrl(image.filePath),
-      })) || []
+      images: [] // Images are now at question level
     };
 
     return transformedQuiz;

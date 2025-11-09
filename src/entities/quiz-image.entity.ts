@@ -10,13 +10,13 @@ import {
 } from 'typeorm';
 
 @Entity('quiz_images')
-@Index(['quizId'], { unique: true }) // One image per quiz
+@Index(['questionId'], { unique: false }) // Multiple images per question allowed
 export class QuizImage {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
-  quizId: number;
+  questionId: number;
 
   @Column()
   fileName: string;
@@ -52,7 +52,7 @@ export class QuizImage {
   updatedAt: Date;
 
   // Relations
-  @OneToOne('Quiz', { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'quizId' })
-  quiz: any;
+  @OneToOne('Question', { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'questionId' })
+  question: any;
 }

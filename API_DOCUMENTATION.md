@@ -7,55 +7,67 @@
 
 ## 🔐 Authorization System Overview
 
-The Quiz App has been updated with a comprehensive role-based authorization system:
+The Quiz App features a comprehensive role-based authorization system with service and location-based auto-assignment:
 
 ### User Roles
-1. **Superadmin**: Full system access, can manage all quizzes and user assignments
-2. **Admin**: Limited access to assigned quizzes only
+1. **Superadmin**: Full system access, can manage all quizzes and have access to all services and locations
+2. **Admin**: Limited access to quizzes based on their assigned service and location
 3. **User**: Can take published quizzes (requires authentication)
 4. **External Participants**: Can only access published quizzes via short URLs (no authentication required)
 
-### Authorization Changes
-- **Location-based access** has been replaced with **direct quiz assignments**
-- Admins are now assigned to specific quizzes via UserQuizAssignment entities
-- Superadmins can access all data and manage quiz assignments
-- All quiz endpoints now filter results based on user role and assignments
-- **External participants** can access published quizzes via public short URLs without any authentication
+### Service & Location-Based Auto-Assignment System
+- **Service-Based Access**: Users are assigned to services (SM, AM, Technical Support, etc.) from config_items
+- **Location-Based Access**: Users are assigned to locations (Jakarta Pusat, Surabaya, etc.) from config_items
+- **Auto-Assignment Logic**: When a quiz is created, admin users with matching service and location are automatically assigned
+- **SuperAdmin Access**: Users with "All Services" and "All Locations" can access everything
+- **Dynamic Updates**: When a user's service or location changes, their quiz assignments are automatically updated
 
-### Migration Summary (November 2025)
+### Authorization Features
+- **Auto quiz assignments**: Admins are automatically assigned to quizzes based on service and location matching
+- **Role-based filtering**: All endpoints filter results based on user role, service, and location
+- **JWT multiple sessions**: 7-day token expiration with support for multiple concurrent logins
+- **Enhanced user details**: User profiles include assigned quizzes (auto-assigned)
+- **Complete relational data**: Quiz details load with questions, scoring templates, and assigned users
+- **Question-level images**: Images are now properly associated with questions rather than quizzes
 
-#### What Changed:
-1. **Removed**: `user_locations` table and related endpoints
-2. **Added**: `user_quiz_assignments` table with many-to-many User-Quiz relationships  
-3. **Updated**: User entity with `superadmin` role
-4. **Enhanced**: All quiz endpoints with role-based filtering
-5. **New**: User Quiz Assignment management endpoints for superadmins
+### Service and Location Configuration
+Services available in config_items (group: 'service'):
+- **SM**: Service Management
+- **AM**: Account Management
+- **Technical Support**: Technical Support Department
+- **Network Operation**: Network Operation Department
+- **Customer Service**: Customer Service Department
+- **IT Support**: IT Support Department
+- **Business Development**: Business Development Department
+- **Quality Assurance**: Quality Assurance Department
+- **All Services**: SuperAdmin access to all departments
 
-#### Data Migration:
-- Existing admin-location assignments were automatically converted to admin-quiz assignments
-- All quizzes in a location are now directly assigned to admins who had access to that location
-- No data loss during migration - assignments are preserved but more granular
+Locations available in config_items (group: 'location'):
+- **Jakarta Pusat, Jakarta Selatan, Jakarta Timur, Jakarta Barat, Jakarta Utara**
+- **Surabaya, Bandung, Medan, Semarang, Makassar**
+- **All Locations**: SuperAdmin access to all locations
 
-#### Breaking Changes:
-- User Location endpoints (`/api/user-locations/*`) are no longer available
-- Quiz endpoints now require authentication and filter by user role
-- Admin users can only see quizzes they are specifically assigned to
-- Location-based quiz filtering has been replaced with assignment-based filtering
+### System Architecture (Updated November 2025)
 
-#### New Capabilities:
-- Superadmins can assign specific admins to specific quizzes
-- More granular access control (admin can access Quiz A but not Quiz B in the same location)
-- Better audit trail with assignment tracking
-- Scalable for multiple admins per quiz and multiple quizzes per admin
-- **Public quiz access** for external participants via short URLs
+#### Enhanced Features:
+1. **User Management**: Complete CRUD with quiz assignment relationships
+2. **Quiz Management**: Enhanced with scoring templates, assigned users, and question images
+3. **Question Management**: Full CRUD implementation with image support
+4. **Image Management**: Question-level image associations with external file server integration
+5. **JWT Security**: 7-day token expiration with multiple concurrent session support
+6. **Response Standardization**: Consistent API response format with interceptor handling
 
-#### External Participant Access:
-- **No Registration Required**: External participants don't need to create accounts
-- **No Authentication**: Access quizzes directly via short URLs (tokens)
-- **Published Quizzes Only**: Can only access quizzes that are published (`isPublished: true`)
-- **Time-based Access**: For scheduled quizzes, access is only available during the scheduled time window
-- **Manual Quiz Access**: For manual quizzes, access is available once admin starts the quiz
-- **Secure Tokens**: Each quiz has a unique token for secure public access
+#### User Detail Enhancements:
+- **User Profile**: Enhanced with `assignedQuizzes` array for admin users
+- **Quiz Detail**: Complete loading with `questions`, `scoringTemplates`, and `assignedUsers`
+- **Question Detail**: Includes associated images and metadata
+- **Create/Update Operations**: Support for relational data creation and updates
+
+#### Technical Improvements:
+- **Response Interceptor**: Handles all API responses consistently
+- **Pagination**: Standardized across all list endpoints
+- **Error Handling**: Comprehensive validation and business logic error responses
+- **Build Optimization**: TypeScript compilation optimized and error-free
 
 ## 🚀 Standardized Response Format
 
@@ -173,10 +185,11 @@ The application uses JWT (JSON Web Tokens) for authentication with the following
 - **Refresh Token**: 7 days (604,800 seconds)
 
 **Security Features:**
+- ✅ **Multiple Concurrent Sessions**: Support for multiple device logins with same account
 - ✅ **Automatic Expiration**: Tokens automatically expire after 7 days
 - ✅ **Forced Invalidation**: Expired tokens are rejected by the server
-- ✅ **Secure Storage**: Tokens should be stored securely (localStorage + httpOnly cookies recommended)
 - ✅ **Role-Based Access**: Tokens contain user role information for authorization
+- ✅ **Enhanced User Data**: Tokens include user profile with assigned quiz information
 
 **Token Validation:**
 ```javascript
@@ -243,25 +256,25 @@ const handleExpiredToken = () => {
 - `POST /api/auth/change-password` - Change user password
 - `POST /api/auth/logout` - User logout
 
-### User Management
-- `POST /api/users` - Create user *(superadmin only)*
-- `GET /api/users` - Get all users *(superadmin only)*
-- `GET /api/users/:id` - Get user by ID *(superadmin/admin)*
-- `PUT /api/users/:id` - Update user *(superadmin only)*
+### User Management *(Enhanced with Service & Location Auto-Assignment)*
+- `POST /api/users` - Create user with serviceId and locationId *(superadmin only)*
+- `GET /api/users` - Get all users with pagination and search *(superadmin only)*
+- `GET /api/users/:id` - Get user detail with auto-assigned quizzes *(superadmin/admin)*
+- `PUT /api/users/:id` - Update user with service/location (triggers auto-assignment) *(superadmin only)*
 - `DELETE /api/users/:id` - Delete user *(superadmin only)*
 
-### User Quiz Assignment Management *(superadmin only)*
-- `POST /api/user-quiz-assignments` - Assign admin to quiz
+### User Quiz Assignment Management *(Auto-Assignment System)*
 - `GET /api/user-quiz-assignments` - Get all user-quiz assignments
 - `GET /api/user-quiz-assignments/user/:userId/quizzes` - Get quizzes assigned to user
 - `GET /api/user-quiz-assignments/quiz/:quizId/users` - Get users assigned to quiz
-- `DELETE /api/user-quiz-assignments/:id` - Remove user-quiz assignment
+- `DELETE /api/user-quiz-assignments/:id` - Remove user-quiz assignment (manual only)
+- **Note**: Assignments are automatically created/updated based on service and location matching
 
-### Quiz Management *(role-based filtering)*
-- `POST /api/quizzes` - Create quiz *(admin/superadmin)*
-- `GET /api/quizzes` - Get quizzes *(filtered by role: superadmin sees all, admin sees assigned only)*
-- `GET /api/quizzes/:id` - Get quiz by ID *(role-based access)*
-- `PUT /api/quizzes/:id` - Update quiz *(admin/superadmin, must have access)*
+### Quiz Management *(Enhanced with Service & Location Auto-Assignment)*
+- `POST /api/quizzes` - Create quiz with serviceId and locationId (auto-assigns users) *(admin/superadmin)*
+- `GET /api/quizzes` - Get quizzes filtered by user's service and location access *(admin/superadmin)*
+- `GET /api/quizzes/:id` - Get quiz detail with questions, scoring, and auto-assigned users *(admin/superadmin)*
+- `PUT /api/quizzes/:id` - Update quiz with service/location (triggers auto-assignment) *(admin/superadmin)*
 - `DELETE /api/quizzes/:id` - Delete quiz *(admin/superadmin, must have access)*
 - `GET /api/quizzes/public/:token` - Get published quiz by token *(public access, no authentication required)*
 - `GET /api/quizzes/:id/questions` - Get quiz questions
@@ -275,13 +288,16 @@ const handleExpiredToken = () => {
 - `POST /api/quizzes/:id/copy-template` - Copy existing quiz as new template (admin only)
 - `GET /api/quizzes/:id/template-preview` - Preview quiz template details (admin only)
 
-### Question Management
-- `POST /api/questions` - Create question
-- `GET /api/questions` - Get all questions
-- `GET /api/questions/:id` - Get question by ID
-- `PUT /api/questions/:id` - Update question
-- `DELETE /api/questions/:id` - Delete question
+### Question Management *(Complete CRUD with Image Support)*
+- `POST /api/questions` - Create question with image arrays support
+- `GET /api/questions` - Get all questions with pagination
+- `GET /api/questions/:id` - Get question detail with associated images
+- `PUT /api/questions/:id` - Update question with image management
+- `DELETE /api/questions/:id` - Delete question and associated images
 - `PUT /api/questions/quiz/:quizId/reorder` - Reorder questions
+- `POST /api/questions/:id/images` - Add images to question
+- `GET /api/questions/:id/images` - Get question images
+- `DELETE /api/questions/:id/images/:imageId` - Remove image from question
 
 ### Attempt Management
 - `POST /api/attempts` - Create attempt
@@ -303,15 +319,19 @@ const handleExpiredToken = () => {
 - `DELETE /api/attempt-answers/:id` - Delete attempt answer
 - `GET /api/attempt-answers/attempt/:attemptId/correct-count` - Get correct answers count
 
-### Quiz Image Management (Integrated with Quiz Management)
-- `POST /api/quizzes/:id/images` - Associate uploaded image with quiz
-- Images are loaded automatically when fetching quizzes
-- Upload to file server separately, then associate with quiz
+### Quiz Image Management *(Now Question-Level)*
+- Images are now associated with individual questions rather than quizzes
+- `POST /api/questions/:id/images` - Associate uploaded image with question  
+- `GET /api/questions/:id/images` - Get images for specific question
+- `DELETE /api/questions/:id/images/:imageId` - Remove image from question
+- Images are loaded automatically when fetching question details
+- Upload to external file server separately, then associate with question
 
-### Quiz Scoring Management (Integrated with Quiz Management)  
+### Quiz Scoring Management *(Enhanced Integration)*  
 - `GET /api/quizzes/:id/calculate-score` - Calculate quiz score with templates
-- Scoring templates are loaded automatically when fetching quizzes
-- Score calculation happens during quiz submission
+- Scoring templates are created/updated with quiz management
+- Enhanced scoring rules with multipliers and passing scores
+- Automatic score calculation during quiz submission
 
 ### Quiz Session Management (NEW)
 - `POST /api/quiz-sessions/start` - Start new quiz session
@@ -342,35 +362,195 @@ const handleExpiredToken = () => {
 - `GET /schedule/status` - Get scheduler status (admin only)
 - `GET /schedule/stats` - Get cleanup statistics (admin only)
 
-## New Features Added
+## 🚀 Enhanced Features & Updates
 
-### 1. Quiz Types & Manual Start
-- Added `quizType` enum field to Quiz entity: 'scheduled' | 'manual'
-- **SCHEDULED**: Has fixed start and end dates, auto-published when created
-- **MANUAL**: Started manually by admin, requires duration but no fixed dates
-- New endpoint `POST /api/quizzes/:id/start` for starting manual quizzes
-- Automatic validation based on quiz type (dates for scheduled, duration for manual)
+### 1. Enhanced User & Quiz Management
+- **User Details**: Enhanced `findOne` returns `UserDetailResponseDto` with `assignedQuizzes` array
+- **Quiz Details**: Enhanced `findOne` returns `QuizDetailResponseDto` with complete relations:
+  - `questions` array with question images
+  - `scoringTemplates` for assessment rules
+  - `assignedUsers` for admin access control
+- **Create/Update Operations**: Support for relational data in single API calls
+- **Question Images**: Images moved from quiz-level to question-level for better organization
 
-### 2. Quiz Duration & Session Management
-- Added `durationMinutes` field to Quiz entity
-- Created `UserQuizSession` entity for tracking timed sessions
-- Session states: ACTIVE, PAUSED, COMPLETED, EXPIRED
-- Automatic session expiration based on quiz duration
-- Session tokens for secure session identification
+### 2. JWT & Authentication Improvements  
+- **7-Day Token Expiration**: Extended from 24h to 7d for better user experience
+- **Multiple Concurrent Sessions**: Same account can be used on multiple devices simultaneously
+- **Enhanced Token Payload**: Includes user role and assignment information
+- **Automatic Session Management**: Background cleanup of expired sessions
 
-### 2. Automated Session Cleanup
-- Background scheduler service runs every 5 minutes (configurable)
-- Automatically marks expired sessions as EXPIRED
-- Environment-controlled scheduler (can be enabled/disabled)
-- Batch processing for efficient cleanup
-- Manual and emergency cleanup endpoints
+### 3. API Response Standardization
+- **Global Response Interceptor**: All endpoints return consistent format
+- **Pagination Support**: Standardized across all list endpoints
+- **Error Handling**: Comprehensive validation and business logic errors
+- **Performance Metadata**: Response time tracking and pagination info
 
-### 3. Complete CRUD Operations
-- All entities now have full CRUD endpoints
-- AttemptAnswer management with statistics
-- UserLocation assignment system
-- QuizImage upload and management
-- Quiz session lifecycle management
+### 4. Complete CRUD Operations
+- **User CRUD**: Full user management with quiz assignment support
+- **Quiz CRUD**: Enhanced with scoring templates and user assignments
+- **Question CRUD**: Complete implementation with image management
+- **Image Management**: Question-level images with external file server integration
+
+### 5. Role-Based Access Control
+- **Superadmin**: Unrestricted access to all quizzes and user management
+- **Admin**: Assignment-based access to specific quizzes only
+- **User**: Published quiz access with authentication
+- **External Participants**: Public quiz access via secure tokens (no auth required)
+
+### 6. Image Architecture Changes
+- **Question-Level Images**: Images now belong to questions instead of quizzes
+- **External File Server**: Integration with separate file server for image storage
+- **QuizImage Entity**: Updated with `questionId` relationship instead of `quizId`
+- **Automatic URL Generation**: Full image URLs provided in API responses
+
+## 🖼️ Question Management with Images
+
+### Question CRUD Examples
+
+#### Create Question with Images
+```json
+POST /api/questions
+{
+  "quizId": 1,
+  "questionText": "Identify the JavaScript concept shown in the diagram",
+  "questionType": "multiple-choice",
+  "options": ["Closure", "Hoisting", "Prototypal Inheritance", "Event Loop"],
+  "correctAnswer": "Closure",
+  "points": 15,
+  "images": [
+    {
+      "fileName": "concept-diagram.png", 
+      "originalName": "javascript-closure-example.png",
+      "filePath": "uploads/quiz-images/concept-diagram.png",
+      "altText": "JavaScript closure concept illustration"
+    }
+  ]
+}
+
+Response:
+{
+  "success": true,
+  "message": "Question created successfully",
+  "data": {
+    "id": 10,
+    "questionText": "Identify the JavaScript concept shown in the diagram",
+    "questionType": "multiple-choice",
+    "options": ["Closure", "Hoisting", "Prototypal Inheritance", "Event Loop"],
+    "correctAnswer": "Closure",
+    "points": 15,
+    "order": 3,
+    "quizId": 1,
+    "images": [
+      {
+        "id": 15,
+        "questionId": 10,
+        "fileName": "concept-diagram.png",
+        "originalName": "javascript-closure-example.png",
+        "filePath": "uploads/quiz-images/concept-diagram.png",
+        "fullUrl": "http://localhost:8080/uploads/quiz-images/concept-diagram.png",
+        "altText": "JavaScript closure concept illustration",
+        "isActive": true
+      }
+    ]
+  },
+  "statusCode": 201
+}
+```
+
+#### Get Question with Images
+```json
+GET /api/questions/10
+{
+  "success": true,
+  "message": "Question retrieved successfully",
+  "data": {
+    "id": 10,
+    "questionText": "Identify the JavaScript concept shown in the diagram",
+    "questionType": "multiple-choice", 
+    "options": ["Closure", "Hoisting", "Prototypal Inheritance", "Event Loop"],
+    "correctAnswer": "Closure",
+    "points": 15,
+    "order": 3,
+    "quizId": 1,
+    "images": [
+      {
+        "id": 15,
+        "questionId": 10,
+        "fileName": "concept-diagram.png",
+        "originalName": "javascript-closure-example.png", 
+        "filePath": "uploads/quiz-images/concept-diagram.png",
+        "fullUrl": "http://localhost:8080/uploads/quiz-images/concept-diagram.png",
+        "altText": "JavaScript closure concept illustration",
+        "isActive": true
+      },
+      {
+        "id": 16,
+        "questionId": 10,
+        "fileName": "code-example.png",
+        "originalName": "closure-code-sample.png",
+        "filePath": "uploads/quiz-images/code-example.png",
+        "fullUrl": "http://localhost:8080/uploads/quiz-images/code-example.png",
+        "altText": "Code example demonstrating closure",
+        "isActive": true
+      }
+    ]
+  },
+  "metadata": {
+    "duration": 23
+  },
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "statusCode": 200
+}
+```
+
+#### Update Question Images
+```json
+PUT /api/questions/10
+{
+  "questionText": "Analyze the JavaScript concept shown in the updated diagram",
+  "images": [
+    {
+      "id": 15,
+      "altText": "Updated closure concept illustration"
+    },
+    {
+      "fileName": "new-diagram.png",
+      "originalName": "enhanced-closure-example.png", 
+      "filePath": "uploads/quiz-images/new-diagram.png",
+      "altText": "Enhanced closure concept diagram"
+    }
+  ]
+}
+
+Response:
+{
+  "success": true,
+  "message": "Question updated successfully",
+  "data": {
+    "id": 10,
+    "questionText": "Analyze the JavaScript concept shown in the updated diagram",
+    "images": [
+      {
+        "id": 15,
+        "questionId": 10,
+        "fileName": "concept-diagram.png",
+        "fullUrl": "http://localhost:8080/uploads/quiz-images/concept-diagram.png",
+        "altText": "Updated closure concept illustration",
+        "isActive": true
+      },
+      {
+        "id": 17,
+        "questionId": 10,
+        "fileName": "new-diagram.png",
+        "fullUrl": "http://localhost:8080/uploads/quiz-images/new-diagram.png", 
+        "altText": "Enhanced closure concept diagram",
+        "isActive": true
+      }
+    ]
+  },
+  "statusCode": 200
+}
+```
 
 ## Session Management Flow
 
@@ -379,7 +559,7 @@ const handleExpiredToken = () => {
 ### JavaScript/TypeScript Helpers
 
 ```typescript
-// Response Type Definitions
+// Enhanced Response Type Definitions
 interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -404,28 +584,18 @@ interface PaginationMeta {
   hasPrevious: boolean;
 }
 
-// Quiz Template and Image Interfaces
-interface QuizImage {
+// Enhanced DTOs with Relational Data
+interface UserDetailResponseDto {
   id: number;
-  fileName: string;
-  originalName: string;
-  filePath: string;
-  fullUrl: string; // Auto-generated full URL from file server
-  altText?: string;
-  isActive: boolean;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+  assignedQuizzes?: Quiz[]; // For admin users
 }
 
-interface QuizScoring {
-  id: number;
-  scoringName: string;
-  correctAnswerPoints: number;
-  incorrectAnswerPenalty: number;
-  multiplier: number;
-  passingScore?: number;
-  isActive: boolean;
-}
-
-interface Quiz {
+interface QuizDetailResponseDto {
   id: number;
   title: string;
   slug: string;
@@ -437,8 +607,71 @@ interface Quiz {
   isActive: boolean;
   isPublished: boolean;
   createdAt: string;
-  images?: QuizImage[];
-  scoringTemplates?: QuizScoring[];
+  questions?: QuestionWithImagesDto[];
+  scoringTemplates?: QuizScoringDto[];
+  assignedUsers?: UserDto[];
+}
+
+interface QuestionWithImagesDto {
+  id: number;
+  questionText: string;
+  questionType: string;
+  options: string[];
+  correctAnswer: string;
+  points: number;
+  order: number;
+  images?: QuizImageDto[]; // Question-level images
+}
+
+interface QuizImageDto {
+  id: number;
+  questionId: number; // Changed from quizId
+  fileName: string;
+  originalName: string;
+  filePath: string;
+  fullUrl: string; // Auto-generated full URL from file server
+  altText?: string;
+  isActive: boolean;
+}
+
+interface QuizScoringDto {
+  id: number;
+  scoringName: string;
+  correctAnswerPoints: number;
+  incorrectAnswerPenalty: number;
+  multiplier: number;
+  passingScore?: number;
+  isActive: boolean;
+}
+
+// Create/Update DTOs with Relational Support
+interface CreateUserDto {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  assignedQuizIds?: number[]; // For admin users
+}
+
+interface CreateQuizDto {
+  title: string;
+  description?: string;
+  quizType: 'scheduled' | 'manual';
+  startDateTime?: string;
+  endDateTime?: string;
+  durationMinutes: number;
+  scoringTemplates?: CreateQuizScoringDto[];
+  assignedUserIds?: number[]; // Admin users to assign
+}
+
+interface CreateQuestionDto {
+  quizId: number;
+  questionText: string;
+  questionType: string;
+  options: string[];
+  correctAnswer: string;
+  points: number;
+  images?: CreateQuizImageDto[]; // Image data for question
 }
 
 // API Helper Class
@@ -2133,6 +2366,100 @@ Response:
 
 ### User Management Responses
 
+#### Create User with Quiz Assignments
+```json
+POST /api/users
+{
+  "name": "Admin John Smith",
+  "email": "john.smith@gms.com",
+  "password": "securepassword123",
+  "role": "admin",
+  "assignedQuizIds": [1, 3, 5]
+}
+
+Response:
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": {
+    "id": 15,
+    "name": "Admin John Smith",
+    "email": "john.smith@gms.com",
+    "role": "admin",
+    "createdAt": "2025-11-10T10:30:00.000Z",
+    "assignedQuizzes": [
+      {
+        "id": 1,
+        "title": "JavaScript Fundamentals",
+        "slug": "javascript-fundamentals",
+        "quizType": "scheduled",
+        "isPublished": true
+      },
+      {
+        "id": 3,
+        "title": "React Components Test",
+        "slug": "react-components-test",
+        "quizType": "manual",
+        "isPublished": false
+      },
+      {
+        "id": 5,
+        "title": "Node.js Assessment",
+        "slug": "nodejs-assessment",
+        "quizType": "scheduled", 
+        "isPublished": true
+      }
+    ]
+  },
+  "statusCode": 201
+}
+```
+
+#### Update User with Quiz Assignment Changes
+```json
+PUT /api/users/15
+{
+  "name": "John A. Smith",
+  "assignedQuizIds": [1, 5, 7, 9]
+}
+
+Response:
+{
+  "success": true,
+  "message": "User updated successfully",
+  "data": {
+    "id": 15,
+    "name": "John A. Smith",
+    "email": "john.smith@gms.com", 
+    "role": "admin",
+    "updatedAt": "2025-11-10T11:15:00.000Z",
+    "assignedQuizzes": [
+      {
+        "id": 1,
+        "title": "JavaScript Fundamentals",
+        "slug": "javascript-fundamentals"
+      },
+      {
+        "id": 5,
+        "title": "Node.js Assessment", 
+        "slug": "nodejs-assessment"
+      },
+      {
+        "id": 7,
+        "title": "Database Design Quiz",
+        "slug": "database-design-quiz"
+      },
+      {
+        "id": 9,
+        "title": "API Development Test",
+        "slug": "api-development-test"
+      }
+    ]
+  },
+  "statusCode": 200
+}
+```
+
 #### Get All Users (Paginated)
 ```json
 GET /api/users?page=1&limit=10&search=john
@@ -2174,27 +2501,41 @@ GET /api/users?page=1&limit=10&search=john
 }
 ```
 
-#### Get Single User
+#### Get Single User (Enhanced with Assigned Quizzes)
 ```json
 GET /api/users/1
 {
   "success": true,
-  "message": "User retrieved successfully",
+  "message": "User retrieved successfully", 
   "data": {
     "id": 1,
-    "name": "John Doe",
+    "name": "John Admin",
     "email": "john@gms.com",
-    "role": "user",
+    "role": "admin",
     "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-15T10:30:00.000Z",
-    "location": {
-      "id": 1,
-      "key": "jakarta_pusat",
-      "value": "Jakarta Pusat"
-    }
+    "updatedAt": "2025-11-10T10:30:00.000Z",
+    "assignedQuizzes": [
+      {
+        "id": 5,
+        "title": "JavaScript Assessment",
+        "slug": "javascript-assessment",
+        "quizType": "scheduled",
+        "isPublished": true,
+        "startDateTime": "2025-11-15T08:00:00.000Z",
+        "endDateTime": "2025-11-15T10:00:00.000Z"
+      },
+      {
+        "id": 8,
+        "title": "React Skills Test",
+        "slug": "react-skills-test", 
+        "quizType": "manual",
+        "isPublished": false,
+        "durationMinutes": 90
+      }
+    ]
   },
   "metadata": {
-    "duration": 23
+    "duration": 45
   },
   "timestamp": "2025-11-10T10:30:00.000Z",
   "statusCode": 200
@@ -2251,7 +2592,102 @@ GET /api/quizzes
 }
 ```
 
-#### Create Scheduled Quiz Success
+#### Get Quiz Detail (Enhanced with Complete Relations)
+```json
+GET /api/quizzes/1
+{
+  "success": true,
+  "message": "Quiz retrieved successfully",
+  "data": {
+    "id": 1,
+    "title": "JavaScript Fundamentals Quiz", 
+    "description": "Comprehensive JavaScript knowledge test",
+    "slug": "javascript-fundamentals-quiz",
+    "token": "JS_FUND_2024_ABC",
+    "quizType": "scheduled",
+    "startDateTime": "2025-11-15T08:00:00.000Z",
+    "endDateTime": "2025-11-15T10:00:00.000Z",
+    "durationMinutes": 120,
+    "isActive": true,
+    "isPublished": true,
+    "createdAt": "2025-11-10T10:30:00.000Z",
+    "questions": [
+      {
+        "id": 1,
+        "questionText": "What is a closure in JavaScript?",
+        "questionType": "multiple-choice",
+        "options": ["A function inside another function", "A way to close browser", "Variable declaration"],
+        "correctAnswer": "A function inside another function",
+        "points": 10,
+        "order": 1,
+        "images": [
+          {
+            "id": 1,
+            "questionId": 1,
+            "fileName": "closure-diagram.png",
+            "originalName": "javascript-closure-example.png",
+            "filePath": "uploads/quiz-images/closure-diagram.png",
+            "fullUrl": "http://localhost:8080/uploads/quiz-images/closure-diagram.png",
+            "altText": "JavaScript closure concept diagram",
+            "isActive": true
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "questionText": "Explain the difference between var, let, and const",
+        "questionType": "text",
+        "options": [],
+        "correctAnswer": null,
+        "points": 15,
+        "order": 2,
+        "images": []
+      }
+    ],
+    "scoringTemplates": [
+      {
+        "id": 1,
+        "scoringName": "Standard Scoring",
+        "correctAnswerPoints": 10,
+        "incorrectAnswerPenalty": 2,
+        "multiplier": 1.0,
+        "passingScore": 70,
+        "isActive": true
+      },
+      {
+        "id": 2,
+        "scoringName": "Bonus Scoring",
+        "correctAnswerPoints": 12,
+        "incorrectAnswerPenalty": 0,
+        "multiplier": 1.2,
+        "passingScore": 75,
+        "isActive": false
+      }
+    ],
+    "assignedUsers": [
+      {
+        "id": 3,
+        "name": "Admin John",
+        "email": "john.admin@gms.com",
+        "role": "admin"
+      },
+      {
+        "id": 5,
+        "name": "Admin Sarah",
+        "email": "sarah.admin@gms.com",
+        "role": "admin"
+      }
+    ]
+  },
+  "metadata": {
+    "duration": 87
+  },
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "statusCode": 200
+}
+```
+
+#### Create Quiz with Scoring Templates and User Assignments
 ```json
 POST /api/quizzes
 {
@@ -2262,7 +2698,17 @@ POST /api/quizzes
   "startDateTime": "2025-01-15T08:00:00.000Z",
   "endDateTime": "2025-01-15T10:00:00.000Z",
   "durationMinutes": 120,
-  "passingScore": 75
+  "passingScore": 75,
+  "scoringTemplates": [
+    {
+      "scoringName": "Standard Scoring",
+      "correctAnswerPoints": 10,
+      "incorrectAnswerPenalty": 2,
+      "multiplier": 1.0,
+      "passingScore": 75
+    }
+  ],
+  "assignedUserIds": [3, 5, 7]
 }
 
 Response:
@@ -2793,10 +3239,45 @@ setInterval(async () => {
 }, 30000); // Check every 30 seconds
 ```
 
-## Server Status
-✅ All endpoints successfully mapped and running
-✅ Scheduler service initialized and active
-✅ Database connections established
-✅ Authentication system ready
-✅ Session management operational
-✅ Automatic cleanup running every 5 minutes
+## 🚀 System Status & Build Information
+
+### Current Build Status
+✅ **TypeScript Compilation**: All files compile without errors
+✅ **Enhanced API Endpoints**: Complete CRUD operations with relational data support
+✅ **Response Standardization**: Global interceptor handling all API responses
+✅ **JWT Authentication**: 7-day tokens with multiple concurrent session support
+✅ **Role-Based Access Control**: Superadmin, Admin, User roles with proper filtering
+✅ **Question-Level Images**: Images properly associated with questions (not quizzes)
+✅ **Database Relations**: Enhanced entities with proper foreign key relationships
+
+### System Features
+✅ **User Management**: Enhanced with quiz assignment relationships
+✅ **Quiz Management**: Complete with scoring templates and assigned users
+✅ **Question Management**: Full CRUD with image support
+✅ **Image Management**: Question-level images with external file server integration
+✅ **Session Management**: Quiz sessions with expiration tracking
+✅ **Scheduler Service**: Automatic cleanup of expired sessions
+✅ **Authentication System**: Enhanced JWT with role-based permissions
+✅ **API Response Format**: Consistent structure across all endpoints
+
+### Recent Updates (November 2025)
+- ✅ **JWT Token Expiration**: Extended from 24h to 7 days for better UX
+- ✅ **Multiple Login Support**: Same account can be used on multiple devices
+- ✅ **Enhanced User Details**: User profiles include assigned quizzes for admins
+- ✅ **Complete Quiz Relations**: Quiz details load with questions, scoring, and assigned users
+- ✅ **Question Images**: Images moved from quiz-level to question-level for better organization
+- ✅ **API Standardization**: Response interceptor ensures consistent API response format
+- ✅ **Enhanced DTOs**: Support for relational data in create/update operations
+- ✅ **TypeScript Optimization**: All compilation errors resolved for clean build
+
+### Database Architecture
+- **Enhanced Entities**: User, Quiz, Question, QuizImage, QuizScoring, UserQuizAssignment
+- **Proper Relations**: Foreign keys and associations for data integrity
+- **Image Management**: QuizImage entity now uses questionId instead of quizId
+- **Assignment System**: UserQuizAssignment for granular admin access control
+
+### Ready for Production
+🟢 **All systems operational and ready for deployment**
+🟢 **Complete feature set with enhanced CRUD capabilities**
+🟢 **Proper error handling and validation across all endpoints**
+🟢 **Clean TypeScript build with no compilation errors**

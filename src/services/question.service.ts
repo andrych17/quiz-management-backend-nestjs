@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Question } from '../entities/question.entity';
 import { Quiz } from '../entities/quiz.entity';
-import { CreateQuestionDto, UpdateQuestionDto, QuestionResponseDto } from '../dto/question.dto';
+import { QuizImage } from '../entities/quiz-image.entity';
+import { CreateQuestionDto, UpdateQuestionDto, QuestionResponseDto, QuestionDetailResponseDto } from '../dto/question.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 
 @Injectable()
@@ -13,9 +14,11 @@ export class QuestionService {
     private questionRepository: Repository<Question>,
     @InjectRepository(Quiz)
     private quizRepository: Repository<Quiz>,
+    @InjectRepository(QuizImage)
+    private quizImageRepository: Repository<QuizImage>,
   ) {}
 
-  async create(createQuestionDto: CreateQuestionDto): Promise<QuestionResponseDto> {
+  async create(createQuestionDto: CreateQuestionDto): Promise<QuestionDetailResponseDto> {
     try {
       // Verify quiz exists
       const quiz = await this.quizRepository.findOne({
@@ -35,8 +38,33 @@ export class QuestionService {
         createQuestionDto.order = lastQuestion ? lastQuestion.order + 1 : 1;
       }
 
-      const question = this.questionRepository.create(createQuestionDto);
-      return await this.questionRepository.save(question);
+      // Exclude images from question creation
+      const { images, ...questionData } = createQuestionDto;
+      const question = this.questionRepository.create(questionData);
+      const savedQuestion = await this.questionRepository.save(question);
+
+      // Handle images
+      let savedImages = [];
+      if (images && images.length > 0) {
+        const questionImages = images.map(imageData => 
+          this.quizImageRepository.create({
+            questionId: savedQuestion.id,
+            fileName: imageData.fileName,
+            originalName: imageData.originalName,
+            mimeType: imageData.mimeType,
+            fileSize: imageData.fileSize,
+            filePath: imageData.filePath,
+            altText: imageData.altText,
+            isActive: true,
+          })
+        );
+        savedImages = await this.quizImageRepository.save(questionImages);
+      }
+
+      return {
+        ...savedQuestion,
+        images: savedImages,
+      } as QuestionDetailResponseDto;
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -70,7 +98,7 @@ export class QuestionService {
     };
   }
 
-  async findOne(id: number): Promise<QuestionResponseDto> {
+  async findOne(id: number): Promise<QuestionDetailResponseDto> {
     const question = await this.questionRepository.findOne({
       where: { id },
       relations: ['quiz'],
@@ -80,17 +108,54 @@ export class QuestionService {
       throw new NotFoundException(ERROR_MESSAGES.RECORD_NOT_FOUND);
     }
 
-    return question;
+    // Get question images
+    const images = await this.quizImageRepository.find({
+      where: { questionId: id, isActive: true },
+      order: { createdAt: 'ASC' },
+    });
+
+    return {
+      ...question,
+      images,
+    } as QuestionDetailResponseDto;
   }
 
-  async update(id: number, updateQuestionDto: UpdateQuestionDto): Promise<QuestionResponseDto> {
+  async update(id: number, updateQuestionDto: UpdateQuestionDto): Promise<QuestionDetailResponseDto> {
     const question = await this.questionRepository.findOne({ where: { id } });
 
     if (!question) {
       throw new NotFoundException(ERROR_MESSAGES.RECORD_NOT_FOUND);
     }
 
-    await this.questionRepository.update(id, updateQuestionDto);
+    // Prepare update data excluding images
+    const { images, ...questionData } = updateQuestionDto;
+
+    // Update question basic data
+    await this.questionRepository.update(id, questionData);
+
+    // Handle images update
+    if (images !== undefined) {
+      // Delete existing images
+      await this.quizImageRepository.delete({ questionId: id });
+      
+      // Create new images if provided
+      if (images.length > 0) {
+        const newImages = images.map(imageData => 
+          this.quizImageRepository.create({
+            questionId: id,
+            fileName: imageData.fileName,
+            originalName: imageData.originalName,
+            mimeType: imageData.mimeType,
+            fileSize: imageData.fileSize,
+            filePath: imageData.filePath,
+            altText: imageData.altText,
+            isActive: true,
+          })
+        );
+        await this.quizImageRepository.save(newImages);
+      }
+    }
+
     return this.findOne(id);
   }
 

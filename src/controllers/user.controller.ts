@@ -20,7 +20,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UserService } from '../services/user.service';
-import { CreateUserDto, UpdateUserDto, UserResponseDto } from '../dto/user.dto';
+import { CreateUserDto, UpdateUserDto, UserResponseDto, UserDetailResponseDto } from '../dto/user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
@@ -35,13 +35,13 @@ export class UserController {
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'User created successfully',
-    type: UserResponseDto,
+    type: UserDetailResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input data',
   })
-  async create(@Body() createUserDto: CreateUserDto): Promise<StdApiResponse<UserResponseDto>> {
+  async create(@Body() createUserDto: CreateUserDto): Promise<StdApiResponse<UserDetailResponseDto>> {
     const result = await this.userService.create(createUserDto);
     return ResponseFactory.success(result, 'User created successfully', undefined, HttpStatus.CREATED);
   }
@@ -63,27 +63,27 @@ export class UserController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
-  ): Promise<StdApiResponse<any>> {
+  ) {
     return this.userService.findAll(page, limit, search);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiOperation({ summary: 'Get user by ID with complete details (assigned quizzes)' })
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'User retrieved successfully',
-    type: UserResponseDto,
+    description: 'User retrieved successfully with complete details',
+    type: UserDetailResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'User not found',
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<UserResponseDto>> {
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<UserDetailResponseDto>> {
     const result = await this.userService.findOne(id);
-    return ResponseFactory.success(result, 'User retrieved successfully');
+    return ResponseFactory.success(result, 'User retrieved successfully with complete details');
   }
 
   @Put(':id')
@@ -92,7 +92,7 @@ export class UserController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'User updated successfully',
-    type: UserResponseDto,
+    type: UserDetailResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -101,7 +101,7 @@ export class UserController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
-  ): Promise<StdApiResponse<UserResponseDto>> {
+  ): Promise<StdApiResponse<UserDetailResponseDto>> {
     const result = await this.userService.update(id, updateUserDto);
     return ResponseFactory.success(result, 'User updated successfully');
   }

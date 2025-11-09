@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsEnum } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsEnum, IsArray } from 'class-validator';
 
 export enum UserRole {
+  SUPERADMIN = 'superadmin',
   ADMIN = 'admin',
   USER = 'user',
 }
@@ -34,6 +35,12 @@ export class CreateUserDto {
   @ApiPropertyOptional({ example: 1, description: 'Location ID from config items' })
   @IsOptional()
   locationId?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'Service ID from config items (SM, AM, dll)' })
+  @IsOptional()
+  serviceId?: number;
+
+
 }
 
 export class UpdateUserDto {
@@ -65,6 +72,12 @@ export class UpdateUserDto {
   @ApiPropertyOptional({ example: 1, description: 'Location ID from config items' })
   @IsOptional()
   locationId?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'Service ID from config items (SM, AM, dll)' })
+  @IsOptional()
+  serviceId?: number;
+
+
 }
 
 export class UserResponseDto {
@@ -85,4 +98,45 @@ export class UserResponseDto {
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Last update date' })
   updatedAt: Date;
+}
+
+export class UserDetailResponseDto {
+  @ApiProperty({ example: 1, description: 'User ID' })
+  id: number;
+
+  @ApiProperty({ example: 'John Doe', description: 'Full name of the user' })
+  name: string;
+
+  @ApiProperty({ example: 'john@example.com', description: 'Email address' })
+  email: string;
+
+  @ApiProperty({ example: 'admin', description: 'User role' })
+  role: UserRole;
+
+  @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Creation date' })
+  createdAt: Date;
+
+  @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Last update date' })
+  updatedAt: Date;
+
+  @ApiPropertyOptional({ 
+    type: 'array', 
+    description: 'Assigned quizzes (auto-assigned based on service and location)',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        serviceType: { type: 'string' },
+        quizType: { type: 'string' },
+        isActive: { type: 'boolean' },
+        startDateTime: { type: 'string', format: 'date-time' },
+        endDateTime: { type: 'string', format: 'date-time' },
+        createdAt: { type: 'string', format: 'date-time' },
+        assignmentType: { type: 'string', description: 'Assignment type (auto/manual)' }
+      }
+    }
+  })
+  assignedQuizzes?: any[];
 }

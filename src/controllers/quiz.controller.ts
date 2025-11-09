@@ -22,7 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { UrlShortenerService } from '../services/url-shortener.service';
-import { CreateQuizDto, UpdateQuizDto, QuizResponseDto, ServiceType, StartManualQuizDto } from '../dto/quiz.dto';
+import { CreateQuizDto, UpdateQuizDto, QuizResponseDto, QuizDetailResponseDto, ServiceType, StartManualQuizDto } from '../dto/quiz.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
@@ -43,9 +43,9 @@ export class QuizController {
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Quiz created successfully',
-    type: QuizResponseDto,
+    type: QuizDetailResponseDto,
   })
-  async create(@Body() createQuizDto: CreateQuizDto): Promise<StdApiResponse<QuizResponseDto>> {
+  async create(@Body() createQuizDto: CreateQuizDto): Promise<StdApiResponse<QuizDetailResponseDto>> {
     const result = await this.quizService.create(createQuizDto);
     return ResponseFactory.success(result, 'Quiz created successfully', undefined, HttpStatus.CREATED);
   }
@@ -70,22 +70,26 @@ export class QuizController {
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
     @Query('isActive') isActive?: boolean,
-  ): Promise<StdApiResponse<any>> {
+  ) {
     const user = req.user;
     return this.quizService.findAllForUser(user.id, user.role, page, limit, search, isActive);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get quiz by ID' })
+  @ApiOperation({ summary: 'Get quiz by ID with complete details (questions, scoring, assigned users)' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Quiz retrieved successfully',
-    type: QuizResponseDto,
+    description: 'Quiz retrieved successfully with complete details',
+    type: QuizDetailResponseDto,
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<QuizResponseDto>> {
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Quiz not found',
+  })
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<QuizDetailResponseDto>> {
     const result = await this.quizService.findOne(id);
-    return ResponseFactory.success(result, 'Quiz retrieved successfully');
+    return ResponseFactory.success(result, 'Quiz retrieved successfully with complete details');
   }
 
   @Put(':id')
@@ -204,32 +208,15 @@ export class QuizController {
     @Param('id', ParseIntPipe) id: number,
     @Query('alias') alias?: string,
   ): Promise<StdApiResponse<{
-    id: number;
-    token: string;
-    originalUrl: string;
+    normalUrl: string;
     shortUrl: string;
-    alias?: string;
   }>> {
-    // Get quiz details
-    const quiz = await this.quizService.findOne(id);
-    if (!quiz) {
-      throw new Error('Quiz not found');
-    }
-
-    // Generate the original URL
-    const originalUrl = this.urlShortenerService.generateQuizUrl(quiz.token);
-
-    // Create short URL with optional alias
-    const shortUrl = await this.urlShortenerService.shortenUrl(originalUrl, alias);
-
-    // Update the quiz with the new link
-    await this.quizService.update(id, { quizLink: shortUrl });
+    // Generate URLs and publish quiz
+    const urls = await this.quizService.generateLink(id);
 
     const result = {
-      id: quiz.id,
-      token: quiz.token,
-      originalUrl,
-      shortUrl,
+      normalUrl: urls.normalUrl,
+      shortUrl: urls.shortUrl,
       alias: alias || undefined,
     };
 
@@ -339,9 +326,8 @@ export class QuizController {
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
     @Query('serviceType') serviceType?: ServiceType,
-  ): Promise<StdApiResponse<any>> {
-    const result = await this.quizService.getQuizTemplates(page, limit, search, serviceType);
-    return result;
+  ) {
+    return this.quizService.getQuizTemplates(page, limit, search, serviceType);
   }
 
   @Post(':id/copy-template')
