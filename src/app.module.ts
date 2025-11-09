@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 
 // Entities
 import { User } from './entities/user.entity';
@@ -42,6 +43,9 @@ import { QuizImageService } from './services/quiz-image.service';
 // Auth Module
 import { AuthModule } from './auth/auth.module';
 
+// Schedule Module
+import { ScheduleAppModule } from './schedule/schedule.module';
+
 import { databaseConfig } from './config/database.config';
 
 @Module({
@@ -50,6 +54,7 @@ import { databaseConfig } from './config/database.config';
       isGlobal: true,
       load: [databaseConfig],
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [databaseConfig.KEY],
       useFactory: (config) => config,
@@ -67,6 +72,7 @@ import { databaseConfig } from './config/database.config';
       UserQuizSession,
     ]),
     AuthModule,
+    ScheduleAppModule,
   ],
   controllers: [
     UserController,
