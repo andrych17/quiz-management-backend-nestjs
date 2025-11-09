@@ -4,6 +4,7 @@ import { Repository, Like } from 'typeorm';
 import { ConfigItem } from '../entities/config-item.entity';
 import { CreateConfigItemDto, UpdateConfigItemDto, ConfigItemResponseDto } from '../dto/config.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
+import { ApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
 
 @Injectable()
 export class ConfigService {
@@ -36,7 +37,7 @@ export class ConfigService {
     }
   }
 
-  async findAll(page: number = 1, limit: number = 10, group?: string) {
+  async findAll(page: number = 1, limit: number = 10, group?: string): Promise<ApiResponse<any>> {
     const skip = (page - 1) * limit;
     const whereCondition: any = {};
 
@@ -51,13 +52,13 @@ export class ConfigService {
       order: { group: 'ASC', key: 'ASC' },
     });
 
-    return {
-      data: configItems,
+    return ResponseFactory.paginated(
+      configItems,
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
-    };
+      group ? `Found ${total} config items in group "${group}"` : 'Config items retrieved successfully'
+    );
   }
 
   async findOne(id: number): Promise<ConfigItemResponseDto> {

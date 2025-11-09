@@ -7,6 +7,7 @@ import { UserLocation } from '../entities/user-location.entity';
 import { ConfigItem } from '../entities/config-item.entity';
 import { CreateUserDto, UpdateUserDto, UserResponseDto, UserRole } from '../dto/user.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, DEFAULTS } from '../constants';
+import { ApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
 
 @Injectable()
 export class UserService {
@@ -71,7 +72,7 @@ export class UserService {
     }
   }
 
-  async findAll(page: number = 1, limit: number = 10, search?: string) {
+  async findAll(page: number = 1, limit: number = 10, search?: string): Promise<ApiResponse<any>> {
     const skip = (page - 1) * limit;
     const whereCondition = search
       ? [
@@ -85,23 +86,23 @@ export class UserService {
       skip,
       take: limit,
       select: ['id', 'name', 'email', 'role', 'createdAt', 'updatedAt'],
-      relations: ['location', 'location.configItem'],
+      relations: ['location', 'location.location'],
     });
 
-    return {
-      data: users,
+    return ResponseFactory.paginated(
+      users,
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
-    };
+      search ? `Found ${total} users matching "${search}"` : 'Users retrieved successfully'
+    );
   }
 
   async findOne(id: number): Promise<UserResponseDto> {
     const user = await this.userRepository.findOne({
       where: { id },
       select: ['id', 'name', 'email', 'role', 'createdAt', 'updatedAt'],
-      relations: ['location', 'location.configItem'],
+      relations: ['location', 'location.location'],
     });
 
     if (!user) {

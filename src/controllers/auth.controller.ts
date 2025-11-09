@@ -24,6 +24,7 @@ import {
   RefreshTokenDto, 
   ChangePasswordDto 
 } from '../dto/auth.dto';
+import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
 
 @ApiTags('authentication')
 @Controller('api/auth')
@@ -43,8 +44,9 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED,
     description: 'Invalid credentials',
   })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto): Promise<StdApiResponse<AuthResponseDto>> {
+    const result = await this.authService.login(loginDto);
+    return ResponseFactory.success(result, 'Login successful');
   }
 
   @Post('register')
@@ -58,8 +60,9 @@ export class AuthController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Email already exists or validation error',
   })
-  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
-    return this.authService.register(registerDto);
+  async register(@Body() registerDto: RegisterDto): Promise<StdApiResponse<AuthResponseDto>> {
+    const result = await this.authService.register(registerDto);
+    return ResponseFactory.success(result, 'Registration successful', undefined, HttpStatus.CREATED);
   }
 
   @Post('refresh')
@@ -73,8 +76,9 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED,
     description: 'Invalid refresh token',
   })
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto): Promise<AuthResponseDto> {
-    return this.authService.refreshToken(refreshTokenDto.refresh_token);
+  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto): Promise<StdApiResponse<AuthResponseDto>> {
+    const result = await this.authService.refreshToken(refreshTokenDto.refresh_token);
+    return ResponseFactory.success(result, 'Token refreshed successfully');
   }
 
   @Get('profile')
@@ -89,8 +93,9 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED,
     description: 'Unauthorized access',
   })
-  async getProfile(@Request() req: any) {
-    return this.authService.getProfile(req.user.id);
+  async getProfile(@Request() req: any): Promise<StdApiResponse<any>> {
+    const result = await this.authService.getProfile(req.user.id);
+    return ResponseFactory.success(result, 'Profile retrieved successfully');
   }
 
   @Post('change-password')
@@ -112,8 +117,9 @@ export class AuthController {
   async changePassword(
     @Request() req: any,
     @Body() changePasswordDto: ChangePasswordDto,
-  ) {
-    return this.authService.changePassword(req.user.id, changePasswordDto);
+  ): Promise<StdApiResponse<any>> {
+    const result = await this.authService.changePassword(req.user.id, changePasswordDto);
+    return ResponseFactory.success(result, 'Password changed successfully');
   }
 
   @Post('logout')
@@ -124,7 +130,8 @@ export class AuthController {
     status: HttpStatus.OK,
     description: 'Logout successful',
   })
-  async logout(@Request() req: any) {
-    return this.authService.logout(req.user.id);
+  async logout(@Request() req: any): Promise<StdApiResponse<any>> {
+    const result = await this.authService.logout(req.user.id);
+    return ResponseFactory.success(result, 'Logout successful');
   }
 }

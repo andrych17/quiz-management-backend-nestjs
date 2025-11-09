@@ -14,6 +14,11 @@ export enum ServiceType {
   DEVOPS = 'devops',
 }
 
+export enum QuizType {
+  SCHEDULED = 'scheduled',
+  MANUAL = 'manual',
+}
+
 export class CreateQuizDto {
   @ApiProperty({ example: 'JavaScript Basics', description: 'Quiz title' })
   @IsNotEmpty()
@@ -34,6 +39,17 @@ export class CreateQuizDto {
   @IsNotEmpty()
   @IsEnum(ServiceType)
   serviceType: ServiceType;
+
+  @ApiPropertyOptional({ 
+    example: 'scheduled', 
+    description: 'Quiz type: scheduled (has fixed schedule) or manual (started by admin)',
+    enum: QuizType,
+    enumName: 'QuizType',
+    default: QuizType.SCHEDULED
+  })
+  @IsOptional()
+  @IsEnum(QuizType)
+  quizType?: QuizType;
 
   @ApiPropertyOptional({ example: 1, description: 'Location ID from config items (location group)' })
   @IsOptional()
@@ -102,6 +118,16 @@ export class UpdateQuizDto {
   @IsEnum(ServiceType)
   serviceType?: ServiceType;
 
+  @ApiPropertyOptional({ 
+    example: 'scheduled', 
+    description: 'Quiz type: scheduled (has fixed schedule) or manual (started by admin)',
+    enum: QuizType,
+    enumName: 'QuizType'
+  })
+  @IsOptional()
+  @IsEnum(QuizType)
+  quizType?: QuizType;
+
   @ApiPropertyOptional({ example: 1, description: 'Location ID from config items (location group)' })
   @IsOptional()
   @IsNumber()
@@ -167,6 +193,9 @@ export class QuizResponseDto {
   @ApiProperty({ example: 'web-development', description: 'Service type' })
   serviceType: ServiceType;
 
+  @ApiProperty({ example: 'scheduled', description: 'Quiz type (scheduled or manual)' })
+  quizType: QuizType;
+
   @ApiPropertyOptional({ example: 1, description: 'Location ID' })
   locationId?: number;
 
@@ -208,4 +237,47 @@ export class QuizResponseDto {
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Last update date' })
   updatedAt: Date;
+
+  @ApiPropertyOptional({ 
+    description: 'Quiz images',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        imageUrl: { type: 'string' },
+        altText: { type: 'string' },
+        order: { type: 'number' }
+      }
+    }
+  })
+  images?: any[];
+
+  @ApiPropertyOptional({ 
+    description: 'Quiz scoring templates',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        minScore: { type: 'number' },
+        maxScore: { type: 'number' },
+        grade: { type: 'string' },
+        description: { type: 'string' }
+      }
+    }
+  })
+  scoringTemplates?: any[];
+}
+
+export class StartManualQuizDto {
+  @ApiPropertyOptional({ example: '2024-01-01T08:00:00.000Z', description: 'Custom start date and time (default: now)' })
+  @IsOptional()
+  @IsDateString()
+  startDateTime?: string;
+
+  @ApiPropertyOptional({ example: 120, description: 'Override quiz duration in minutes' })
+  @IsOptional()
+  @IsNumber()
+  durationMinutes?: number;
 }

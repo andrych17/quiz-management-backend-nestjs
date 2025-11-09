@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { ConfigService } from '../services/config.service';
 import { CreateConfigItemDto, UpdateConfigItemDto, ConfigItemResponseDto } from '../dto/config.dto';
+import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
 
 @ApiTags('config')
 @Controller('api/config')
@@ -32,8 +33,9 @@ export class ConfigController {
     description: 'Config item created successfully',
     type: ConfigItemResponseDto,
   })
-  async create(@Body() createConfigItemDto: CreateConfigItemDto): Promise<ConfigItemResponseDto> {
-    return this.configService.create(createConfigItemDto);
+  async create(@Body() createConfigItemDto: CreateConfigItemDto): Promise<StdApiResponse<ConfigItemResponseDto>> {
+    const result = await this.configService.create(createConfigItemDto);
+    return ResponseFactory.success(result, 'Config item created successfully', undefined, HttpStatus.CREATED);
   }
 
   @Get()
@@ -50,7 +52,7 @@ export class ConfigController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('group') group?: string,
-  ) {
+  ): Promise<StdApiResponse<any>> {
     return this.configService.findAll(page, limit, group);
   }
 
@@ -61,8 +63,9 @@ export class ConfigController {
     description: 'Location config items retrieved successfully',
     type: [ConfigItemResponseDto],
   })
-  async getLocations() {
-    return this.configService.getLocations();
+  async getLocations(): Promise<StdApiResponse<any>> {
+    const result = await this.configService.getLocations();
+    return ResponseFactory.success(result, 'Location config items retrieved successfully');
   }
 
   @Get(':id')
@@ -73,8 +76,9 @@ export class ConfigController {
     description: 'Config item retrieved successfully',
     type: ConfigItemResponseDto,
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<ConfigItemResponseDto> {
-    return this.configService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<ConfigItemResponseDto>> {
+    const result = await this.configService.findOne(id);
+    return ResponseFactory.success(result, 'Config item retrieved successfully');
   }
 
   @Put(':id')
@@ -88,8 +92,9 @@ export class ConfigController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateConfigItemDto: UpdateConfigItemDto,
-  ): Promise<ConfigItemResponseDto> {
-    return this.configService.update(id, updateConfigItemDto);
+  ): Promise<StdApiResponse<ConfigItemResponseDto>> {
+    const result = await this.configService.update(id, updateConfigItemDto);
+    return ResponseFactory.success(result, 'Config item updated successfully');
   }
 
   @Delete(':id')
@@ -99,8 +104,9 @@ export class ConfigController {
     status: HttpStatus.OK,
     description: 'Config item deleted successfully',
   })
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.configService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<any>> {
+    await this.configService.remove(id);
+    return ResponseFactory.success(null, 'Config item deleted successfully');
   }
 
   @Get('group/:group')
@@ -111,7 +117,8 @@ export class ConfigController {
     description: 'Config items retrieved successfully',
     type: [ConfigItemResponseDto],
   })
-  async findByGroup(@Param('group') group: string) {
-    return this.configService.findByGroup(group);
+  async findByGroup(@Param('group') group: string): Promise<StdApiResponse<any>> {
+    const result = await this.configService.findByGroup(group);
+    return ResponseFactory.success(result, `Config items for group "${group}" retrieved successfully`);
   }
 }

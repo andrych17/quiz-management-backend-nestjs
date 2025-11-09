@@ -13,6 +13,11 @@ import {
 import { ConfigItem } from './config-item.entity';
 import { ServiceType } from '../dto/quiz.dto';
 
+export enum QuizType {
+  SCHEDULED = 'scheduled',
+  MANUAL = 'manual',
+}
+
 @Entity('quizzes')
 @Index(['token'], { unique: true })
 @Index(['slug'])
@@ -39,6 +44,14 @@ export class Quiz {
     enum: ServiceType,
   })
   serviceType: ServiceType; // Jenis pelayanan (e.g., 'service-management', 'network-management', 'database-admin', etc.)
+
+  @Column({
+    type: 'enum',
+    enum: QuizType,
+    enumName: 'quiz_type_enum',
+    default: QuizType.SCHEDULED,
+  })
+  quizType: QuizType; // SCHEDULED = ada jadwal tetap, MANUAL = dimulai manual oleh admin
 
   @Column({ nullable: true })
   locationId: number; // Assigned location dari config_items

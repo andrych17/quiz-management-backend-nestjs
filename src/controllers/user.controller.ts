@@ -23,6 +23,7 @@ import { UserService } from '../services/user.service';
 import { CreateUserDto, UpdateUserDto, UserResponseDto } from '../dto/user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
+import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
 
 @ApiTags('users')
 @Controller('api/users')
@@ -40,8 +41,9 @@ export class UserController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input data',
   })
-  async create(@Body() createUserDto: CreateUserDto): Promise<UserResponseDto> {
-    return this.userService.create(createUserDto);
+  async create(@Body() createUserDto: CreateUserDto): Promise<StdApiResponse<UserResponseDto>> {
+    const result = await this.userService.create(createUserDto);
+    return ResponseFactory.success(result, 'User created successfully', undefined, HttpStatus.CREATED);
   }
 
   @Get()
@@ -61,7 +63,7 @@ export class UserController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
-  ) {
+  ): Promise<StdApiResponse<any>> {
     return this.userService.findAll(page, limit, search);
   }
 
@@ -79,8 +81,9 @@ export class UserController {
     status: HttpStatus.NOT_FOUND,
     description: 'User not found',
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<UserResponseDto> {
-    return this.userService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<UserResponseDto>> {
+    const result = await this.userService.findOne(id);
+    return ResponseFactory.success(result, 'User retrieved successfully');
   }
 
   @Put(':id')
@@ -98,8 +101,9 @@ export class UserController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
-  ): Promise<UserResponseDto> {
-    return this.userService.update(id, updateUserDto);
+  ): Promise<StdApiResponse<UserResponseDto>> {
+    const result = await this.userService.update(id, updateUserDto);
+    return ResponseFactory.success(result, 'User updated successfully');
   }
 
   @Delete(':id')
@@ -113,7 +117,8 @@ export class UserController {
     status: HttpStatus.NOT_FOUND,
     description: 'User not found',
   })
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.userService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<any>> {
+    await this.userService.remove(id);
+    return ResponseFactory.success(null, 'User deleted successfully');
   }
 }

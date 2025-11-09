@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { QuestionService } from '../services/question.service';
 import { CreateQuestionDto, UpdateQuestionDto, QuestionResponseDto } from '../dto/question.dto';
+import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
 
 @ApiTags('questions')
 @Controller('api/questions')
