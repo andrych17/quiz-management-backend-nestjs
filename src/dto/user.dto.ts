@@ -32,13 +32,15 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @ApiPropertyOptional({ example: 1, description: 'Location ID from config items' })
+  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key from config items' })
   @IsOptional()
-  locationId?: number;
+  @IsString()
+  locationKey?: string;
 
-  @ApiPropertyOptional({ example: 1, description: 'Service ID from config items (SM, AM, dll)' })
+  @ApiPropertyOptional({ example: 'sm', description: 'Service key from config items (SM, AM, dll)' })
   @IsOptional()
-  serviceId?: number;
+  @IsString()
+  serviceKey?: string;
 
 
 }
@@ -69,13 +71,15 @@ export class UpdateUserDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @ApiPropertyOptional({ example: 1, description: 'Location ID from config items' })
+  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key from config items' })
   @IsOptional()
-  locationId?: number;
+  @IsString()
+  locationKey?: string;
 
-  @ApiPropertyOptional({ example: 1, description: 'Service ID from config items (SM, AM, dll)' })
+  @ApiPropertyOptional({ example: 'sm', description: 'Service key from config items (SM, AM, dll)' })
   @IsOptional()
-  serviceId?: number;
+  @IsString()
+  serviceKey?: string;
 
 
 }
@@ -92,6 +96,24 @@ export class UserResponseDto {
 
   @ApiProperty({ example: 'admin', description: 'User role' })
   role: UserRole;
+
+  @ApiPropertyOptional({ example: 'sm', description: 'Service key' })
+  serviceKey?: string;
+
+  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key' })
+  locationKey?: string;
+
+  @ApiPropertyOptional({ 
+    example: { id: 1, key: 'sm', value: 'Service Management' }, 
+    description: 'Service details' 
+  })
+  service?: any;
+
+  @ApiPropertyOptional({ 
+    example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' }, 
+    description: 'Location details' 
+  })
+  location?: any;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Creation date' })
   createdAt: Date;
@@ -112,6 +134,24 @@ export class UserDetailResponseDto {
 
   @ApiProperty({ example: 'admin', description: 'User role' })
   role: UserRole;
+
+  @ApiPropertyOptional({ example: 'sm', description: 'Service key' })
+  serviceKey?: string;
+
+  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key' })
+  locationKey?: string;
+
+  @ApiPropertyOptional({ 
+    example: { id: 1, key: 'sm', value: 'Service Management' }, 
+    description: 'Service details' 
+  })
+  service?: any;
+
+  @ApiPropertyOptional({ 
+    example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' }, 
+    description: 'Location details' 
+  })
+  location?: any;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Creation date' })
   createdAt: Date;

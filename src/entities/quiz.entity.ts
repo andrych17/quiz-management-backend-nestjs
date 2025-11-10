@@ -7,10 +7,7 @@ import {
   OneToMany,
   OneToOne,
   Index,
-  ManyToOne,
-  JoinColumn,
 } from 'typeorm';
-import { ConfigItem } from './config-item.entity';
 import { ServiceType } from '../dto/quiz.dto';
 
 export enum QuizType {
@@ -22,8 +19,8 @@ export enum QuizType {
 @Index(['token'], { unique: true })
 @Index(['slug'])
 @Index(['serviceType'])
-@Index(['locationId'])
-@Index(['serviceId'])
+@Index(['locationKey'])
+@Index(['serviceKey'])
 export class Quiz {
   @PrimaryGeneratedColumn()
   id: number;
@@ -55,10 +52,10 @@ export class Quiz {
   quizType: QuizType; // SCHEDULED = ada jadwal tetap, MANUAL = dimulai manual oleh admin
 
   @Column({ nullable: true })
-  locationId: number; // Assigned location dari config_items
+  locationKey: string; // Store config key directly (e.g., 'jakarta_pusat', 'jakarta_utara')
 
   @Column({ nullable: true })
-  serviceId: number; // Assigned service dari config_items (SM, AM, dll)
+  serviceKey: string; // Store config key directly (e.g., 'sm', 'am', 'technical_support')
 
   @Column({ default: 70 })
   passingScore: number; // Passing score dalam persen
@@ -103,14 +100,6 @@ export class Quiz {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => ConfigItem, { nullable: true })
-  @JoinColumn({ name: 'locationId' })
-  location: ConfigItem;
-
-  @ManyToOne(() => ConfigItem, { nullable: true })
-  @JoinColumn({ name: 'serviceId' })
-  service: ConfigItem;
-
   @OneToMany('Question', 'quiz', {
     cascade: true,
     eager: false,

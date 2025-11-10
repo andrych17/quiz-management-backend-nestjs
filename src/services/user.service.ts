@@ -96,21 +96,73 @@ export class UserService {
     }
   }
 
-  async findAll(page: number = 1, limit: number = 10, search?: string): Promise<{ items: UserResponseDto[], pagination: { currentPage: number, totalPages: number, pageSize: number, totalItems: number, hasNext: boolean, hasPrevious: boolean } }> {
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    serviceId?: number,
+    locationId?: number,
+    role?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC'
+  ): Promise<{ items: UserResponseDto[], pagination: { currentPage: number, totalPages: number, pageSize: number, totalItems: number, hasNext: boolean, hasPrevious: boolean } }> {
     const skip = (page - 1) * limit;
-    const whereCondition = search
-      ? [
-          { name: Like(`%${search}%`) },
-          { email: Like(`%${search}%`) },
-        ]
-      : {};
+    
+    // Use query builder for complex joins and filtering
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.service', 'service')
+      .leftJoinAndSelect('user.location', 'location')
+      .select([
+        'user.id',
+        'user.name', 
+        'user.email',
+        'user.role',
+        'user.serviceId',
+        'user.locationId',
+        'user.createdAt',
+        'user.updatedAt',
+        'service.id',
+        'service.key',
+        'service.value',
+        'location.id', 
+        'location.key',
+        'location.value'
+      ]);
 
-    const [users, total] = await this.userRepository.findAndCount({
-      where: whereCondition,
-      skip,
-      take: limit,
-      select: ['id', 'name', 'email', 'role', 'createdAt', 'updatedAt'],
-    });
+    // Add service filter
+    if (serviceId) {
+      queryBuilder.andWhere('user.serviceId = :serviceId', { serviceId });
+    }
+    
+    // Add location filter
+    if (locationId) {
+      queryBuilder.andWhere('user.locationId = :locationId', { locationId });
+    }
+    
+    // Add role filter
+    if (role) {
+      queryBuilder.andWhere('UPPER(user.role) LIKE UPPER(:role)', { role: `%${role}%` });
+    }
+
+    // Add search conditions with LIKE UPPER
+    if (search) {
+      queryBuilder.andWhere(
+        '(UPPER(user.name) LIKE UPPER(:search) OR UPPER(user.email) LIKE UPPER(:search))',
+        { search: `%${search}%` }
+      );
+    }
+
+    // Validate sortBy field to prevent SQL injection
+    const allowedSortFields = ['name', 'email', 'role', 'createdAt', 'updatedAt'];
+    const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'DESC';
+
+    const [users, total] = await queryBuilder
+      .orderBy(`user.${validSortBy}`, validSortOrder)
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
 
     const totalPages = Math.ceil(total / limit);
     
@@ -127,6 +179,16 @@ export class UserService {
       items: users.map(user => ({
         ...user,
         role: user.role as UserRole,
+        service: user.service ? {
+          id: user.service.id,
+          key: user.service.key,
+          value: user.service.value
+        } : null,
+        location: user.location ? {
+          id: user.location.id,
+          key: user.location.key,
+          value: user.location.value
+        } : null,
       })),
       pagination,
     };
@@ -135,7 +197,8 @@ export class UserService {
   async findOne(id: number): Promise<UserDetailResponseDto> {
     const user = await this.userRepository.findOne({
       where: { id },
-      select: ['id', 'name', 'email', 'role', 'createdAt', 'updatedAt'],
+      relations: ['service', 'location'],
+      select: ['id', 'name', 'email', 'role', 'serviceId', 'locationId', 'createdAt', 'updatedAt'],
     });
 
     if (!user) {
@@ -168,6 +231,16 @@ export class UserService {
     return {
       ...user,
       role: user.role as UserRole,
+      service: user.service ? {
+        id: user.service.id,
+        key: user.service.key,
+        value: user.service.value
+      } : null,
+      location: user.location ? {
+        id: user.location.id,
+        key: user.location.key,
+        value: user.location.value
+      } : null,
       assignedQuizzes,
     };
   }

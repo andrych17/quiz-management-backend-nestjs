@@ -208,6 +208,10 @@ export class QuizService {
     limit: number = 10,
     search?: string,
     isActive?: boolean,
+    serviceId?: number,
+    locationId?: number,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const skip = (page - 1) * limit;
     
@@ -216,7 +220,9 @@ export class QuizService {
       .createQueryBuilder('quiz')
       .leftJoinAndSelect('quiz.questions', 'questions')
       .leftJoinAndSelect('quiz.attempts', 'attempts')
-      .leftJoinAndSelect('quiz.scoringTemplates', 'scoringTemplates');
+      .leftJoinAndSelect('quiz.scoringTemplates', 'scoringTemplates')
+      .leftJoinAndSelect('quiz.service', 'service')
+      .leftJoinAndSelect('quiz.location', 'location');
 
     // Superadmin sees all quizzes
     if (userRole === 'superadmin') {
@@ -236,7 +242,10 @@ export class QuizService {
 
     // Apply search filter
     if (search) {
-      queryBuilder.andWhere('quiz.title ILIKE :search', { search: `%${search}%` });
+      queryBuilder.andWhere(
+        '(UPPER(quiz.title) LIKE UPPER(:search) OR UPPER(quiz.description) LIKE UPPER(:search))',
+        { search: `%${search}%` }
+      );
     }
 
     // Apply active filter
@@ -244,9 +253,24 @@ export class QuizService {
       queryBuilder.andWhere('quiz.isActive = :isActive', { isActive });
     }
 
+    // Apply service filter
+    if (serviceId) {
+      queryBuilder.andWhere('quiz.serviceId = :serviceId', { serviceId });
+    }
+
+    // Apply location filter
+    if (locationId) {
+      queryBuilder.andWhere('quiz.locationId = :locationId', { locationId });
+    }
+
+    // Validate sortBy field to prevent SQL injection
+    const allowedSortFields = ['title', 'startDateTime', 'endDateTime', 'createdAt', 'updatedAt', 'passingScore'];
+    const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'DESC';
+
     // Apply pagination and ordering
     const [quizzes, total] = await queryBuilder
-      .orderBy('quiz.createdAt', 'DESC')
+      .orderBy(`quiz.${validSortBy}`, validSortOrder)
       .skip(skip)
       .take(limit)
       .getManyAndCount();

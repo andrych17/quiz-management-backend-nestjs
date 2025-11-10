@@ -42,6 +42,8 @@ export class AttemptController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'email', required: false, type: String })
   @ApiQuery({ name: 'quizId', required: false, type: Number })
+  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (participantName, email, score, submittedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Attempts retrieved successfully',
@@ -52,8 +54,10 @@ export class AttemptController {
     @Query('limit') limit: number = 10,
     @Query('email') email?: string,
     @Query('quizId') quizId?: number,
+    @Query('sortBy') sortBy: string = 'submittedAt',
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
-    return this.attemptService.findAll(page, limit, email, quizId);
+    return this.attemptService.findAll(page, limit, email, quizId, sortBy, sortOrder);
   }
 
   @Get(':id')

@@ -51,15 +51,15 @@ export class CreateQuizDto {
   @IsEnum(QuizType)
   quizType?: QuizType;
 
-  @ApiPropertyOptional({ example: 1, description: 'Location ID from config items (location group)' })
+  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key from config items (location group)' })
   @IsOptional()
-  @IsNumber()
-  locationId?: number;
+  @IsString()
+  locationKey?: string;
 
-  @ApiPropertyOptional({ example: 1, description: 'Service ID from config items (SM, AM, dll)' })
+  @ApiPropertyOptional({ example: 'sm', description: 'Service key from config items (SM, AM, dll)' })
   @IsOptional()
-  @IsNumber()
-  serviceId?: number;
+  @IsString()
+  serviceKey?: string;
 
   @ApiPropertyOptional({ example: 70, description: 'Passing score percentage (default: 70)' })
   @IsOptional()
@@ -166,15 +166,15 @@ export class UpdateQuizDto {
   @IsEnum(QuizType)
   quizType?: QuizType;
 
-  @ApiPropertyOptional({ example: 1, description: 'Location ID from config items (location group)' })
+  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key from config items (location group)' })
   @IsOptional()
-  @IsNumber()
-  locationId?: number;
+  @IsString()
+  locationKey?: string;
 
-  @ApiPropertyOptional({ example: 1, description: 'Service ID from config items (SM, AM, dll)' })
+  @ApiPropertyOptional({ example: 'sm', description: 'Service key from config items (SM, AM, dll)' })
   @IsOptional()
-  @IsNumber()
-  serviceId?: number;
+  @IsString()
+  serviceKey?: string;
 
   @ApiPropertyOptional({ example: 70, description: 'Passing score percentage' })
   @IsOptional()
@@ -274,8 +274,8 @@ export class QuizResponseDto {
   @ApiProperty({ example: 'scheduled', description: 'Quiz type (scheduled or manual)' })
   quizType: QuizType;
 
-  @ApiPropertyOptional({ example: 1, description: 'Location ID' })
-  locationId?: number;
+  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key' })
+  locationKey?: string;
 
   @ApiPropertyOptional({ 
     example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' }, 
@@ -283,11 +283,11 @@ export class QuizResponseDto {
   })
   location?: any;
 
-  @ApiPropertyOptional({ example: 1, description: 'Service ID' })
-  serviceId?: number;
+  @ApiPropertyOptional({ example: 'sm', description: 'Service key' })
+  serviceKey?: string;
 
   @ApiPropertyOptional({ 
-    example: { id: 1, key: 'service_management', value: 'Service Management' }, 
+    example: { id: 1, key: 'sm', value: 'Service Management' }, 
     description: 'Service details' 
   })
   service?: any;

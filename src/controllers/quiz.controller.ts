@@ -59,6 +59,10 @@ export class QuizController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'isActive', required: false, type: Boolean })
+  @ApiQuery({ name: 'serviceId', required: false, type: Number, description: 'Filter by service ID' })
+  @ApiQuery({ name: 'locationId', required: false, type: Number, description: 'Filter by location ID' })
+  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (title, startDateTime, endDateTime, createdAt, updatedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Quizzes retrieved successfully',
@@ -70,9 +74,13 @@ export class QuizController {
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
     @Query('isActive') isActive?: boolean,
+    @Query('serviceId') serviceId?: number,
+    @Query('locationId') locationId?: number,
+    @Query('sortBy') sortBy: string = 'createdAt',
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const user = req.user;
-    return this.quizService.findAllForUser(user.id, user.role, page, limit, search, isActive);
+    return this.quizService.findAllForUser(user.id, user.role, page, limit, search, isActive, serviceId, locationId, sortBy, sortOrder);
   }
 
   @Get(':id')

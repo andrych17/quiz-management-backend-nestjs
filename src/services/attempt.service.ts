@@ -102,6 +102,8 @@ export class AttemptService {
     limit: number = 10,
     email?: string,
     quizId?: number,
+    sortBy: string = 'submittedAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const skip = (page - 1) * limit;
     const whereCondition: any = {};
@@ -114,11 +116,20 @@ export class AttemptService {
       whereCondition.quizId = quizId;
     }
 
+    // Validate sortBy field to prevent SQL injection
+    const allowedSortFields = ['participantName', 'email', 'score', 'submittedAt', 'createdAt'];
+    const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'submittedAt';
+    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'DESC';
+
+    // Build order object
+    const orderOptions: any = {};
+    orderOptions[validSortBy] = validSortOrder;
+
     const [attempts, total] = await this.attemptRepository.findAndCount({
       where: whereCondition,
       skip,
       take: limit,
-      order: { createdAt: 'DESC' },
+      order: orderOptions,
       relations: ['user', 'quiz'],
     });
 

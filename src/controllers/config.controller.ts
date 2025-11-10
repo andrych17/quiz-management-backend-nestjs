@@ -43,6 +43,8 @@ export class ConfigController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'group', required: false, type: String })
+  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (group, key, value, order, createdAt, updatedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Config items retrieved successfully',
@@ -52,8 +54,10 @@ export class ConfigController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('group') group?: string,
+    @Query('sortBy') sortBy: string = 'group',
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'ASC',
   ) {
-    return this.configService.findAll(page, limit, group);
+    return this.configService.findAll(page, limit, group, sortBy, sortOrder);
   }
 
   @Get('locations')

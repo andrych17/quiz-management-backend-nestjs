@@ -43,10 +43,10 @@ export class User {
   updatedBy: string;
 
   @Column({ nullable: true })
-  locationId: number;
+  locationKey: string; // Store config key directly (e.g., 'jakarta_pusat', 'jakarta_utara')
 
   @Column({ nullable: true })
-  serviceId: number;
+  serviceKey: string; // Store config key directly (e.g., 'sm', 'am', 'technical_support')
 
   @CreateDateColumn()
   createdAt: Date;

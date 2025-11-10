@@ -256,10 +256,13 @@ const handleExpiredToken = () => {
 - `POST /api/auth/change-password` - Change user password
 - `POST /api/auth/logout` - User logout
 
-### User Management *(Enhanced with Service & Location Auto-Assignment)*
+### User Management *(Enhanced with Service & Location Auto-Assignment + Filtering & Sorting)*
 - `POST /api/users` - Create user with serviceId and locationId *(superadmin only)*
-- `GET /api/users` - Get all users with pagination and search *(superadmin only)*
-- `GET /api/users/:id` - Get user detail with auto-assigned quizzes *(superadmin/admin)*
+- `GET /api/users` - Get all users with pagination, search, filtering, and sorting *(superadmin only)*
+  - **Filters**: `serviceId`, `locationId`, `role`, `search` (name/email)
+  - **Sorting**: `sortBy` (name, email, role, createdAt, updatedAt), `sortOrder` (ASC/DESC)
+  - **Enhanced Response**: Includes actual service and location names (not just IDs)
+- `GET /api/users/:id` - Get user detail with auto-assigned quizzes and service/location data *(superadmin/admin)*
 - `PUT /api/users/:id` - Update user with service/location (triggers auto-assignment) *(superadmin only)*
 - `DELETE /api/users/:id` - Delete user *(superadmin only)*
 
@@ -270,9 +273,12 @@ const handleExpiredToken = () => {
 - `DELETE /api/user-quiz-assignments/:id` - Remove user-quiz assignment (manual only)
 - **Note**: Assignments are automatically created/updated based on service and location matching
 
-### Quiz Management *(Enhanced with Service & Location Auto-Assignment)*
+### Quiz Management *(Enhanced with Service & Location Auto-Assignment + Filtering & Sorting)*
 - `POST /api/quizzes` - Create quiz with serviceId and locationId (auto-assigns users) *(admin/superadmin)*
-- `GET /api/quizzes` - Get quizzes filtered by user's service and location access *(admin/superadmin)*
+- `GET /api/quizzes` - Get quizzes with pagination, search, filtering, and sorting *(admin/superadmin)*
+  - **Filters**: `serviceId`, `locationId`, `isActive`, `search` (title/description)
+  - **Sorting**: `sortBy` (title, startDateTime, endDateTime, createdAt, updatedAt, passingScore), `sortOrder` (ASC/DESC)
+  - **Enhanced Response**: Includes actual service and location names with complete relational data
 - `GET /api/quizzes/:id` - Get quiz detail with questions, scoring, and auto-assigned users *(admin/superadmin)*
 - `PUT /api/quizzes/:id` - Update quiz with service/location (triggers auto-assignment) *(admin/superadmin)*
 - `DELETE /api/quizzes/:id` - Delete quiz *(admin/superadmin, must have access)*
@@ -299,9 +305,11 @@ const handleExpiredToken = () => {
 - `GET /api/questions/:id/images` - Get question images
 - `DELETE /api/questions/:id/images/:imageId` - Remove image from question
 
-### Attempt Management
+### Attempt Management *(Enhanced with Filtering & Sorting)*
 - `POST /api/attempts` - Create attempt
-- `GET /api/attempts` - Get all attempts
+- `GET /api/attempts` - Get all attempts with pagination, filtering, and sorting
+  - **Filters**: `email`, `quizId`
+  - **Sorting**: `sortBy` (participantName, email, score, submittedAt, createdAt), `sortOrder` (ASC/DESC)
 - `GET /api/attempts/:id` - Get attempt by ID
 - `PUT /api/attempts/:id` - Update attempt
 - `DELETE /api/attempts/:id` - Delete attempt
@@ -347,11 +355,13 @@ const handleExpiredToken = () => {
 - `GET /api/quiz-sessions/quiz/:quizId/statistics` - Get quiz session statistics
 - `POST /api/quiz-sessions/cleanup-expired` - Manual cleanup expired sessions (admin)
 
-### Configuration Management
+### Configuration Management *(Enhanced with Filtering & Sorting)*
 - `POST /api/config` - Create config item
-- `GET /api/config` - Get all config items
-- `GET /api/config/locations` - Get location configs
-- `GET /api/config/services` - Get service configs
+- `GET /api/config` - Get all config items with pagination, filtering, and sorting
+  - **Filters**: `group` (service, location, app, etc.)
+  - **Sorting**: `sortBy` (group, key, value, order, createdAt, updatedAt), `sortOrder` (ASC/DESC)
+- `GET /api/config/locations` - Get location configs (for dropdowns)
+- `GET /api/config/services` - Get service configs (for dropdowns)
 - `GET /api/config/:id` - Get config by ID
 - `PUT /api/config/:id` - Update config
 - `DELETE /api/config/:id` - Delete config
@@ -363,9 +373,265 @@ const handleExpiredToken = () => {
 - `GET /schedule/status` - Get scheduler status (admin only)
 - `GET /schedule/stats` - Get cleanup statistics (admin only)
 
-## 🚀 Enhanced Features & Updates
+## 🌱 Database Seeding & Sample Data
 
-### 1. Enhanced User & Quiz Management
+### Comprehensive Seeder
+The application includes a comprehensive seeder that creates realistic sample data for development and testing:
+
+```bash
+# Run the comprehensive seeder
+npm run seed:comprehensive
+```
+
+### Seeder Contents
+
+#### Configuration Items (19 items)
+- **App configs**: Application name, version
+- **Service configs**: 
+  - All Services (superadmin access)
+  - Service Management (SM)
+  - Asset Management (AM) 
+  - Technical Support
+  - Network Administrator
+  - Database Administrator
+- **Location configs**:
+  - All Locations (superadmin access)
+  - Jakarta areas (Pusat, Utara, Selatan, Barat, Timur)
+  - Other cities (Tangerang, Bekasi, Depok)
+
+#### Users (12 users)
+- **1 Superadmin**: Full access to all services and locations
+- **8 Admin users**: Distributed across different services and locations
+  - 3 Service Management admins (different locations)
+  - 3 Asset Management admins (different locations) 
+  - 2 Technical Support admins (different locations)
+- **3 Regular users**: Non-admin users with location assignments
+
+#### Quizzes (3 quizzes)
+- **Service Management Quiz**: Jakarta Pusat, scheduled type, 60 minutes
+- **Asset Management Quiz**: Jakarta Utara, scheduled type, 90 minutes  
+- **Technical Support Quiz**: Jakarta Selatan, manual type, 45 minutes
+
+#### Questions (9 questions total)
+- **SM Quiz**: 4 questions (multiple-choice, multiple-select, text)
+- **AM Quiz**: 3 questions (multiple-choice, multiple-select, text)
+- **Tech Quiz**: 2 questions (multiple-choice, multiple-select)
+
+#### Auto-Assignments
+- Automatic quiz assignments based on service and location matching
+- Admins with matching service and location get auto-assigned to relevant quizzes
+
+### Seeder Features
+1. **Incremental Seeding**: Skips seeding if data already exists
+2. **Relational Integrity**: Proper foreign key relationships
+3. **Realistic Data**: Indonesian locations, meaningful quiz content
+4. **Auto-Assignment Demo**: Shows service/location-based assignment system
+5. **Password Hashing**: All users have bcrypt-hashed passwords (`password123`)
+
+### Sample Login Credentials
+```
+Superadmin:
+- Email: superadmin@gms.com
+- Password: password123
+- Access: All quizzes and locations
+
+Service Management Admin:
+- Email: admin.sm@gms.com  
+- Password: password123
+- Access: SM quizzes in Jakarta Pusat
+
+Asset Management Admin:
+- Email: admin.am@gms.com
+- Password: password123  
+- Access: AM quizzes in Jakarta Pusat
+
+Technical Support Admin:
+- Email: admin.tech@gms.com
+- Password: password123
+- Access: Tech quizzes in Jakarta Pusat
+
+Regular User:
+- Email: user1@gms.com
+- Password: password123
+- Access: Published quizzes only
+```
+
+### Testing the Auto-Assignment System
+1. **Login as superadmin** to see all quizzes
+2. **Login as admin.sm@gms.com** to see only SM quizzes for Jakarta Pusat
+3. **Create a new quiz** with specific service/location to test auto-assignment
+4. **Update user service/location** to see assignment changes
+5. **Use filtering/sorting** to test the enhanced table features
+
+## � Advanced Filtering & Sorting System
+
+### Universal Query Parameters
+
+All main data table endpoints now support comprehensive filtering and sorting with standardized parameters:
+
+#### Pagination Parameters
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 10)
+
+#### Search Parameters
+- `search`: Text search with UPPER LIKE %% pattern (searches multiple fields)
+
+#### Sorting Parameters
+- `sortBy`: Field to sort by (validated against allowlist per endpoint)
+- `sortOrder`: Sort direction (`ASC` or `DESC`)
+
+#### Filtering Parameters
+Each endpoint supports specific filters relevant to its data:
+
+### Endpoint-Specific Filtering & Sorting
+
+#### Users Endpoint (`/api/users`)
+```typescript
+GET /api/users?page=1&limit=10&search=admin&serviceId=1&locationId=2&role=admin&sortBy=name&sortOrder=ASC
+
+// Available filters:
+serviceId: number     // Filter by service ID
+locationId: number    // Filter by location ID  
+role: string         // Filter by user role (admin, user, superadmin)
+search: string       // Search in name and email fields
+
+// Available sorting fields:
+sortBy: 'name' | 'email' | 'role' | 'createdAt' | 'updatedAt'
+// Default: createdAt DESC
+
+// Enhanced response includes:
+{
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "name": "John Doe",
+        "email": "john@example.com", 
+        "role": "admin",
+        "serviceId": 1,
+        "locationId": 2,
+        "service": {
+          "id": 1,
+          "key": "service_management", 
+          "value": "Service Management (SM)"
+        },
+        "location": {
+          "id": 2,
+          "key": "jakarta_utara",
+          "value": "Jakarta Utara"
+        },
+        "createdAt": "2024-01-01T00:00:00.000Z"
+      }
+    ],
+    "pagination": { ... }
+  }
+}
+```
+
+#### Quizzes Endpoint (`/api/quizzes`)
+```typescript
+GET /api/quizzes?serviceId=1&locationId=2&isActive=true&search=javascript&sortBy=title&sortOrder=ASC
+
+// Available filters:
+serviceId: number     // Filter by service ID
+locationId: number    // Filter by location ID
+isActive: boolean     // Filter by active status
+search: string       // Search in title and description
+
+// Available sorting fields:
+sortBy: 'title' | 'startDateTime' | 'endDateTime' | 'createdAt' | 'updatedAt' | 'passingScore'
+// Default: createdAt DESC
+
+// Enhanced response includes service/location names
+```
+
+#### Config Items Endpoint (`/api/config`)
+```typescript
+GET /api/config?group=service&sortBy=order&sortOrder=ASC
+
+// Available filters:
+group: string        // Filter by config group (service, location, app)
+
+// Available sorting fields:
+sortBy: 'group' | 'key' | 'value' | 'order' | 'createdAt' | 'updatedAt'
+// Default: group ASC (with secondary sort by key ASC)
+```
+
+#### Attempts Endpoint (`/api/attempts`)
+```typescript
+GET /api/attempts?quizId=1&email=john@example.com&sortBy=score&sortOrder=DESC
+
+// Available filters:
+quizId: number       // Filter by quiz ID
+email: string        // Filter by participant email
+
+// Available sorting fields:
+sortBy: 'participantName' | 'email' | 'score' | 'submittedAt' | 'createdAt'
+// Default: submittedAt DESC
+```
+
+### Security Features
+1. **SQL Injection Prevention**: All `sortBy` fields validated against allowlists
+2. **Parameter Validation**: Only `ASC`/`DESC` accepted for `sortOrder`
+3. **Safe Defaults**: Invalid parameters fall back to safe defaults
+4. **UPPER LIKE Pattern**: Search uses case-insensitive pattern matching
+
+### Usage Examples
+
+#### Complex Filtering & Sorting
+```bash
+# Find admins in Service Management at Jakarta Pusat, sorted by name
+GET /api/users?role=admin&serviceId=1&locationId=2&sortBy=name&sortOrder=ASC
+
+# Find active quizzes with "javascript" in title, sorted by start date
+GET /api/quizzes?isActive=true&search=javascript&sortBy=startDateTime&sortOrder=DESC
+
+# Get service configs sorted by display order
+GET /api/config?group=service&sortBy=order&sortOrder=ASC
+
+# Find quiz attempts with high scores, sorted by score
+GET /api/attempts?quizId=1&sortBy=score&sortOrder=DESC
+```
+
+#### Frontend Integration
+```typescript
+// Build query parameters dynamically
+const buildQueryParams = (filters: any, sorting: any, pagination: any) => {
+  const params = new URLSearchParams({
+    page: pagination.page.toString(),
+    limit: pagination.limit.toString(),
+  });
+
+  // Add filters
+  Object.keys(filters).forEach(key => {
+    if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+      params.append(key, filters[key].toString());
+    }
+  });
+
+  // Add sorting  
+  if (sorting.field) {
+    params.append('sortBy', sorting.field);
+    params.append('sortOrder', sorting.direction || 'ASC');
+  }
+
+  return params.toString();
+};
+
+// Example usage
+const filters = { serviceId: 1, role: 'admin', search: 'john' };
+const sorting = { field: 'name', direction: 'ASC' };  
+const pagination = { page: 1, limit: 10 };
+
+const queryString = buildQueryParams(filters, sorting, pagination);
+// Result: "page=1&limit=10&serviceId=1&role=admin&search=john&sortBy=name&sortOrder=ASC"
+
+fetch(`/api/users?${queryString}`);
+```
+
+## �🚀 Enhanced Features & Updates
+
+### 1. Enhanced User & Quiz Management with Service/Location Display
 - **User Details**: Enhanced `findOne` returns `UserDetailResponseDto` with `assignedQuizzes` array
 - **Quiz Details**: Enhanced `findOne` returns `QuizDetailResponseDto` with complete relations:
   - `questions` array with question images
@@ -555,7 +821,100 @@ Response:
 
 ## Session Management Flow
 
-## 💻 Frontend Integration Examples
+## � Latest Updates Summary (November 2025)
+
+### ✅ Major Features Added
+
+1. **Service & Location-Based Auto-Assignment System**
+   - Users assigned to services (SM, AM, Technical Support, etc.) and locations
+   - Quizzes automatically assign to admins with matching service+location
+   - Superadmin access to all services and locations via "All Services"/"All Locations"
+   - Dynamic assignment updates when user service/location changes
+
+2. **Advanced Filtering & Sorting System**
+   - Universal filtering and sorting across all main endpoints
+   - Service/Location/Role filters with dropdown support
+   - UPPER LIKE %% search pattern for better matching
+   - Security validation against SQL injection
+   - Consistent parameter naming across all endpoints
+
+3. **Enhanced Data Display**
+   - Service and location names displayed (not just IDs) 
+   - Complete relational data loading in responses
+   - User profiles include assigned quiz information
+   - Quiz details include assigned users and complete question data
+
+4. **Comprehensive Database Seeder**
+   - 19 config items (services, locations, app settings)
+   - 12 realistic users across different roles and assignments
+   - 3 sample quizzes with questions and auto-assignments
+   - Ready-to-test login credentials for all user types
+
+5. **API Response Standardization**
+   - Consistent response format across all endpoints
+   - Enhanced pagination with metadata
+   - Proper error handling and validation messages
+   - Response time tracking and performance metrics
+
+### 🔧 Technical Improvements
+
+1. **Database Architecture**
+   - Enhanced User entity with service/location relations
+   - Quiz entity with service/location foreign keys
+   - UserQuizAssignment system for access control
+   - Proper TypeORM relations and indexing
+
+2. **Security Enhancements**
+   - JWT tokens extended to 7-day expiration
+   - Multiple concurrent session support
+   - SQL injection prevention in all filters
+   - Role-based access control at endpoint level
+
+3. **Performance Optimizations**
+   - Query builder usage for complex filtering
+   - Proper database indexes on searchable fields
+   - Pagination support to handle large datasets
+   - Efficient relation loading with select optimization
+
+### 🚀 Ready-to-Use Endpoints
+
+All endpoints now support the enhanced filtering and sorting:
+
+```bash
+# Users with comprehensive filtering
+GET /api/users?serviceId=1&locationId=2&role=admin&search=john&sortBy=name&sortOrder=ASC
+
+# Quizzes with service/location filtering  
+GET /api/quizzes?serviceId=1&isActive=true&search=javascript&sortBy=startDateTime&sortOrder=DESC
+
+# Config items for dropdowns
+GET /api/config/services  # Service dropdown options
+GET /api/config/locations # Location dropdown options
+
+# Attempts with quiz/participant filtering
+GET /api/attempts?quizId=1&email=user@example.com&sortBy=score&sortOrder=DESC
+```
+
+### 📁 Project Files Updated
+
+- **Controllers**: UserController, QuizController, ConfigController, AttemptController
+- **Services**: UserService, QuizService, ConfigService, AttemptService  
+- **Entities**: User entity enhanced with service/location relations
+- **DTOs**: UserResponseDto, QuizResponseDto enhanced with service/location data
+- **Seeders**: New ComprehensiveSeeder with realistic sample data
+- **Documentation**: Complete API documentation with filtering examples
+
+### 🎯 Next Steps for Frontend Implementation
+
+1. **Implement DataTable Components** with sorting headers and filter dropdowns
+2. **Add Service/Location Dropdowns** using `/api/config/services` and `/api/config/locations`
+3. **Create Auto-Assignment Management** for superadmin users
+4. **Build Role-Based Navigation** based on user service/location access
+5. **Test with Sample Data** using the comprehensive seeder accounts
+
+The backend is now fully prepared for a sophisticated frontend implementation with complete filtering, sorting, and role-based access control.
+
+## �💻 Frontend Integration Examples
 
 ### JavaScript/TypeScript Helpers
 
@@ -3276,6 +3635,56 @@ setInterval(async () => {
 - **Proper Relations**: Foreign keys and associations for data integrity
 - **Image Management**: QuizImage entity now uses questionId instead of quizId
 - **Assignment System**: UserQuizAssignment for granular admin access control
+
+### New Service Configuration Endpoint
+
+#### GET /api/config/services
+Get all available services for user/quiz assignment.
+
+**Response:**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Service config items retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "group": "service",
+      "key": "sm",
+      "value": "Service Management", 
+      "description": "Departemen Service Management - pengelolaan layanan pelanggan",
+      "order": 1,
+      "isActive": true,
+      "createdBy": "system",
+      "createdAt": "2025-11-10T07:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "group": "service", 
+      "key": "am",
+      "value": "Account Management",
+      "description": "Departemen Account Management - pengelolaan akun pelanggan",
+      "order": 2,
+      "isActive": true,
+      "createdBy": "system",
+      "createdAt": "2025-11-10T07:00:00.000Z"
+    },
+    {
+      "id": 9,
+      "group": "service",
+      "key": "all_services", 
+      "value": "All Services",
+      "description": "Akses ke semua departemen (SuperAdmin)",
+      "order": 999,
+      "isActive": true,
+      "createdBy": "system",
+      "createdAt": "2025-11-10T07:00:00.000Z"
+    }
+  ],
+  "timestamp": "2025-11-10T07:00:00.000Z"
+}
+```
 
 ### Ready for Production
 🟢 **All systems operational and ready for deployment**

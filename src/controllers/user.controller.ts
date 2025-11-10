@@ -54,6 +54,11 @@ export class UserController {
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name or email' })
+  @ApiQuery({ name: 'serviceId', required: false, type: Number, description: 'Filter by service ID' })
+  @ApiQuery({ name: 'locationId', required: false, type: Number, description: 'Filter by location ID' })
+  @ApiQuery({ name: 'role', required: false, type: String, description: 'Filter by user role' })
+  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (name, email, role, createdAt, updatedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Users retrieved successfully',
@@ -63,8 +68,13 @@ export class UserController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
+    @Query('serviceId') serviceId?: number,
+    @Query('locationId') locationId?: number,
+    @Query('role') role?: string,
+    @Query('sortBy') sortBy: string = 'createdAt',
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
-    return this.userService.findAll(page, limit, search);
+    return this.userService.findAll(page, limit, search, serviceId, locationId, role, sortBy, sortOrder);
   }
 
   @Get(':id')

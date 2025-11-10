@@ -37,7 +37,13 @@ export class ConfigService {
     }
   }
 
-  async findAll(page: number = 1, limit: number = 10, group?: string) {
+  async findAll(
+    page: number = 1, 
+    limit: number = 10, 
+    group?: string,
+    sortBy: string = 'group',
+    sortOrder: 'ASC' | 'DESC' = 'ASC'
+  ) {
     const skip = (page - 1) * limit;
     const whereCondition: any = {};
 
@@ -45,11 +51,25 @@ export class ConfigService {
       whereCondition.group = group;
     }
 
+    // Validate sortBy field to prevent SQL injection
+    const allowedSortFields = ['group', 'key', 'value', 'order', 'createdAt', 'updatedAt'];
+    const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'group';
+    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'ASC';
+
+    // Build order object
+    const orderOptions: any = {};
+    orderOptions[validSortBy] = validSortOrder;
+    
+    // Add secondary sort by key for consistent ordering
+    if (validSortBy !== 'key') {
+      orderOptions.key = 'ASC';
+    }
+
     const [configItems, total] = await this.configItemRepository.findAndCount({
       where: whereCondition,
       skip,
       take: limit,
-      order: { group: 'ASC', key: 'ASC' },
+      order: orderOptions,
     });
 
     const totalPages = Math.ceil(total / limit);
