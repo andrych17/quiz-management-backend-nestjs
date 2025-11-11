@@ -68,13 +68,13 @@ export class UserController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
-    @Query('serviceId') serviceId?: number,
-    @Query('locationId') locationId?: number,
+    @Query('serviceKey') serviceKey?: string,
+    @Query('locationKey') locationKey?: string,
     @Query('role') role?: string,
     @Query('sortBy') sortBy: string = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
-    return this.userService.findAll(page, limit, search, serviceId, locationId, role, sortBy, sortOrder);
+    return this.userService.findAll(page, limit, search, serviceKey, locationKey, role, sortBy, sortOrder);
   }
 
   @Get(':id')

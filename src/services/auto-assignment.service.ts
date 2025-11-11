@@ -21,12 +21,12 @@ export class AutoAssignmentService {
    */
   async autoAssignUsersToQuiz(
     quizId: number, 
-    serviceId: number | null,
-    locationId: number | null, 
+    serviceKey: string | null,
+    locationKey: string | null, 
     createdBy?: string
   ): Promise<UserQuizAssignment[]> {
     // Find matching admin users based on service and location
-    const adminUsers = await this.getMatchingAdminUsers(serviceId, locationId);
+    const adminUsers = await this.getMatchingAdminUsers(serviceKey, locationKey);
 
     if (adminUsers.length === 0) {
       return []; // No matching admin users found
@@ -50,7 +50,7 @@ export class AutoAssignmentService {
           quizId: quizId,
           isActive: true,
           assignedBy: createdBy || 'system',
-          notes: `Auto-assigned based on service/location match (serviceId: ${serviceId}, locationId: ${locationId})`,
+          notes: `Auto-assigned based on service/location match (serviceKey: ${serviceKey}, locationKey: ${locationKey})`,
         });
 
         const savedAssignment = await this.userQuizAssignmentRepository.save(assignment);
@@ -65,53 +65,42 @@ export class AutoAssignmentService {
    * Get matching admin users based on service and location filtering
    */
   async getMatchingAdminUsers(
-    serviceId: number | null, 
-    locationId: number | null
+    serviceKey: string | null, 
+    locationKey: string | null
   ): Promise<User[]> {
-    // Get "all_services" config item ID for superadmin check
-    const allServicesConfig = await this.configItemRepository.findOne({
-      where: { group: 'service', key: 'all_services' }
-    });
-
-    // Get "all_locations" config item ID for superadmin check (if exists)
-    const allLocationsConfig = await this.configItemRepository.findOne({
-      where: { group: 'location', key: 'all_locations' }
-    });
-
     const queryBuilder = this.userRepository.createQueryBuilder('user')
       .where('user.role = :role', { role: 'admin' })
       .andWhere('user.isActive = :isActive', { isActive: true });
 
     // Service filtering logic
-    if (serviceId) {
+    if (serviceKey) {
       queryBuilder.andWhere(
-        '(user.serviceId = :serviceId OR user.serviceId = :allServicesId)',
+        '(user.serviceKey = :serviceKey OR user.serviceKey = :allServicesKey)',
         { 
-          serviceId, 
-          allServicesId: allServicesConfig?.id || null 
+          serviceKey, 
+          allServicesKey: 'all_services'
         }
       );
     } else {
-      // If no serviceId specified, only superadmin with all_services can see
-      queryBuilder.andWhere('user.serviceId = :allServicesId', { 
-        allServicesId: allServicesConfig?.id || null 
+      // If no serviceKey specified, only superadmin with all_services can see
+      queryBuilder.andWhere('user.serviceKey = :allServicesKey', { 
+        allServicesKey: 'all_services'
       });
     }
 
     // Location filtering logic
-    if (locationId) {
-      const locationFilter = allLocationsConfig 
-        ? '(user.locationId = :locationId OR user.locationId = :allLocationsId)'
-        : 'user.locationId = :locationId';
-      
-      queryBuilder.andWhere(locationFilter, {
-        locationId,
-        allLocationsId: allLocationsConfig?.id || null
-      });
-    } else if (allLocationsConfig) {
-      // If no locationId specified, only superadmin with all_locations can see
-      queryBuilder.andWhere('user.locationId = :allLocationsId', { 
-        allLocationsId: allLocationsConfig.id 
+    if (locationKey) {
+      queryBuilder.andWhere(
+        '(user.locationKey = :locationKey OR user.locationKey = :allLocationsKey)',
+        {
+          locationKey,
+          allLocationsKey: 'all_locations'
+        }
+      );
+    } else {
+      // If no locationKey specified, only superadmin with all_locations can see
+      queryBuilder.andWhere('user.locationKey = :allLocationsKey', { 
+        allLocationsKey: 'all_locations'
       });
     }
 
@@ -122,26 +111,26 @@ export class AutoAssignmentService {
    * Get admin users for a specific service and location
    */
   async getAdminUsersForServiceAndLocation(
-    serviceId: number | null, 
-    locationId: number | null
+    serviceKey: string | null, 
+    locationKey: string | null
   ): Promise<User[]> {
-    const users = await this.getMatchingAdminUsers(serviceId, locationId);
+    const users = await this.getMatchingAdminUsers(serviceKey, locationKey);
     
     return users.map(user => ({
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
-      serviceId: user.serviceId,
-      locationId: user.locationId,
+      serviceKey: user.serviceKey,
+      locationKey: user.locationKey,
     } as User));
   }
 
   /**
    * Get admin users for a specific location (backward compatibility)
    */
-  async getAdminUsersForLocation(locationId: number): Promise<User[]> {
-    return this.getAdminUsersForServiceAndLocation(null, locationId);
+  async getAdminUsersForLocation(locationKey: string): Promise<User[]> {
+    return this.getAdminUsersForServiceAndLocation(null, locationKey);
   }
 
   /**
@@ -149,13 +138,13 @@ export class AutoAssignmentService {
    */
   async updateUserServiceLocationAssignments(
     userId: number,
-    newServiceId: number | null,
-    newLocationId: number | null,
-    oldServiceId: number | null,
-    oldLocationId: number | null
+    newServiceKey: string | null,
+    newLocationKey: string | null,
+    oldServiceKey: string | null,
+    oldLocationKey: string | null
   ): Promise<void> {
     // Remove assignments from quizzes that don't match new service/location
-    if (oldServiceId || oldLocationId) {
+    if (oldServiceKey || oldLocationKey) {
       const queryBuilder = this.userQuizAssignmentRepository
         .createQueryBuilder()
         .delete()
@@ -167,14 +156,14 @@ export class AutoAssignmentService {
       let quizWhereConditions: string[] = [];
       const queryParams: any = {};
 
-      if (oldServiceId && oldServiceId !== newServiceId) {
-        quizWhereConditions.push('"serviceId" = :oldServiceId');
-        queryParams.oldServiceId = oldServiceId;
+      if (oldServiceKey && oldServiceKey !== newServiceKey) {
+        quizWhereConditions.push('"serviceKey" = :oldServiceKey');
+        queryParams.oldServiceKey = oldServiceKey;
       }
 
-      if (oldLocationId && oldLocationId !== newLocationId) {
-        quizWhereConditions.push('"locationId" = :oldLocationId');
-        queryParams.oldLocationId = oldLocationId;
+      if (oldLocationKey && oldLocationKey !== newLocationKey) {
+        quizWhereConditions.push('"locationKey" = :oldLocationKey');
+        queryParams.oldLocationKey = oldLocationKey;
       }
 
       if (quizWhereConditions.length > 0) {
@@ -188,20 +177,20 @@ export class AutoAssignmentService {
     }
 
     // Auto-assign to quizzes matching new service and location
-    if (newServiceId || newLocationId) {
-      let quizQuery = 'SELECT id, "serviceId", "locationId" FROM quizzes WHERE 1=1';
+    if (newServiceKey || newLocationKey) {
+      let quizQuery = 'SELECT id, "serviceKey", "locationKey" FROM quizzes WHERE 1=1';
       const params: any[] = [];
       let paramIndex = 1;
 
-      if (newServiceId) {
-        quizQuery += ` AND "serviceId" = $${paramIndex}`;
-        params.push(newServiceId);
+      if (newServiceKey) {
+        quizQuery += ` AND "serviceKey" = $${paramIndex}`;
+        params.push(newServiceKey);
         paramIndex++;
       }
 
-      if (newLocationId) {
-        quizQuery += ` AND "locationId" = $${paramIndex}`;
-        params.push(newLocationId);
+      if (newLocationKey) {
+        quizQuery += ` AND "locationKey" = $${paramIndex}`;
+        params.push(newLocationKey);
         paramIndex++;
       }
 
@@ -221,7 +210,7 @@ export class AutoAssignmentService {
             quizId: quiz.id,
             isActive: true,
             assignedBy: 'system',
-            notes: `Auto-assigned based on service/location change (serviceId: ${newServiceId}, locationId: ${newLocationId})`,
+            notes: `Auto-assigned based on service/location change (serviceKey: ${newServiceKey}, locationKey: ${newLocationKey})`,
           });
 
           await this.userQuizAssignmentRepository.save(assignment);
@@ -235,15 +224,15 @@ export class AutoAssignmentService {
    */
   async updateUserLocationAssignments(
     userId: number, 
-    newLocationId: number | null, 
-    oldLocationId: number | null
+    newLocationKey: string | null, 
+    oldLocationKey: string | null
   ): Promise<void> {
     return this.updateUserServiceLocationAssignments(
       userId, 
       null, 
-      newLocationId, 
+      newLocationKey, 
       null, 
-      oldLocationId
+      oldLocationKey
     );
   }
 
@@ -252,8 +241,8 @@ export class AutoAssignmentService {
    */
   async checkUserQuizAccess(
     userId: number,
-    quizServiceId: number | null,
-    quizLocationId: number | null
+    quizServiceKey: string | null,
+    quizLocationKey: string | null
   ): Promise<boolean> {
     const user = await this.userRepository.findOne({
       where: { id: userId, isActive: true }
@@ -262,16 +251,8 @@ export class AutoAssignmentService {
     if (!user) return false;
 
     // SuperAdmin with all_services and all_locations has access to everything
-    const allServicesConfig = await this.configItemRepository.findOne({
-      where: { group: 'service', key: 'all_services' }
-    });
-    
-    const allLocationsConfig = await this.configItemRepository.findOne({
-      where: { group: 'location', key: 'all_locations' }
-    });
-
-    const hasAllServices = user.serviceId === allServicesConfig?.id;
-    const hasAllLocations = user.locationId === allLocationsConfig?.id;
+    const hasAllServices = user.serviceKey === 'all_services';
+    const hasAllLocations = user.locationKey === 'all_locations';
 
     // SuperAdmin access
     if (hasAllServices && hasAllLocations) {
@@ -279,13 +260,13 @@ export class AutoAssignmentService {
     }
 
     // Service check
-    const serviceMatch = !quizServiceId || 
-                        user.serviceId === quizServiceId || 
+    const serviceMatch = !quizServiceKey || 
+                        user.serviceKey === quizServiceKey || 
                         hasAllServices;
 
     // Location check
-    const locationMatch = !quizLocationId || 
-                         user.locationId === quizLocationId || 
+    const locationMatch = !quizLocationKey || 
+                         user.locationKey === quizLocationKey || 
                          hasAllLocations;
 
     return serviceMatch && locationMatch;

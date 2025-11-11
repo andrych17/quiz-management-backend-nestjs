@@ -1,5 +1,7 @@
 # Quiz App Backend API Documentation
 
+> **🔄 MAJOR UPDATE - November 11, 2025**: Architecture migrated from foreign key relations to direct key-based storage. Users and Quizzes now use `serviceKey`/`locationKey` strings instead of `serviceId`/`locationId` numbers. All API endpoints updated accordingly. See [Database Migration Summary](#️-database-migration-summary) for details.
+
 ## Server Information
 - **Base URL**: http://localhost:3001
 - **API Base URL**: http://localhost:3001/api
@@ -15,12 +17,14 @@ The Quiz App features a comprehensive role-based authorization system with servi
 3. **User**: Can take published quizzes (requires authentication)
 4. **External Participants**: Can only access published quizzes via short URLs (no authentication required)
 
-### Service & Location-Based Auto-Assignment System
-- **Service-Based Access**: Users are assigned to services (SM, AM, Technical Support, etc.) from config_items
-- **Location-Based Access**: Users are assigned to locations (Jakarta Pusat, Surabaya, etc.) from config_items
-- **Auto-Assignment Logic**: When a quiz is created, admin users with matching service and location are automatically assigned
-- **SuperAdmin Access**: Users with "All Services" and "All Locations" can access everything
-- **Dynamic Updates**: When a user's service or location changes, their quiz assignments are automatically updated
+### Service & Location-Based Key Storage System (Updated November 2025)
+- **Direct Key Storage**: Users and quizzes store service/location as string keys (e.g., 'sm', 'jakarta_pusat') instead of foreign key relations
+- **Service Keys**: Direct assignment using service keys ('sm', 'am', 'tech_support', etc.) 
+- **Location Keys**: Direct assignment using location keys ('jakarta_pusat', 'jakarta_utara', etc.)
+- **Auto-Assignment Logic**: When a quiz is created, admin users with matching serviceKey and locationKey are automatically assigned
+- **SuperAdmin Access**: Users with serviceKey='all_services' and locationKey='all_locations' can access everything
+- **Enhanced Performance**: Eliminates JOIN operations, uses direct string matching for faster queries
+- **Configuration Display**: Config items used only for display names, not for relational storage
 
 ### Authorization Features
 - **Auto quiz assignments**: Admins are automatically assigned to quizzes based on service and location matching
@@ -30,28 +34,39 @@ The Quiz App features a comprehensive role-based authorization system with servi
 - **Complete relational data**: Quiz details load with questions, scoring templates, and assigned users
 - **Question-level images**: Images are now properly associated with questions rather than quizzes
 
-### Service and Location Configuration
-Services available in config_items (group: 'service'):
-- **SM**: Service Management
-- **AM**: Account Management
-- **Technical Support**: Technical Support Department
-- **Network Operation**: Network Operation Department
-- **Customer Service**: Customer Service Department
-- **IT Support**: IT Support Department
-- **Business Development**: Business Development Department
-- **Quality Assurance**: Quality Assurance Department
-- **All Services**: SuperAdmin access to all departments
+### Service and Location Key Configuration (Updated November 2025)
+Service keys stored directly in User and Quiz entities:
+- **'sm'**: Service Management
+- **'am'**: Asset Management  
+- **'tech_support'**: Technical Support Department
+- **'netm'**: Network Management Department
+- **'cs'**: Customer Service Department
+- **'it_support'**: IT Support Department
+- **'bd'**: Business Development Department
+- **'qa'**: Quality Assurance Department
+- **'all_services'**: SuperAdmin access to all departments
 
-Locations available in config_items (group: 'location'):
-- **Jakarta Pusat, Jakarta Selatan, Jakarta Timur, Jakarta Barat, Jakarta Utara**
-- **Surabaya, Bandung, Medan, Semarang, Makassar**
-- **All Locations**: SuperAdmin access to all locations
+Location keys stored directly in User and Quiz entities:
+- **'jakarta_pusat', 'jakarta_selatan', 'jakarta_timur', 'jakarta_barat', 'jakarta_utara'**
+- **'surabaya', 'bandung', 'medan', 'semarang', 'makassar'**
+- **'tangerang', 'bekasi', 'depok'**: Additional metropolitan areas
+- **'all_locations'**: SuperAdmin access to all locations
+
+**Note**: Config items (config_items table) are now used only for display purposes and dropdown options. The actual storage uses direct string keys for better performance and simplified queries.
 
 ### System Architecture (Updated November 2025)
 
+#### Key-Based Storage Architecture:
+1. **Direct Key Storage**: Users and Quizzes store serviceKey/locationKey as strings instead of foreign keys
+2. **Eliminated Relations**: Removed ManyToOne relations to ConfigItem for better performance
+3. **String-Based Matching**: Auto-assignment uses direct string comparison instead of JOIN operations
+4. **Config Display Only**: ConfigItem table used only for UI display names and dropdown options
+5. **Database Migration**: Successful data conversion from ID-based to key-based storage
+6. **Universal Keys**: Consistent key format across all services and locations
+
 #### Enhanced Features:
-1. **User Management**: Complete CRUD with quiz assignment relationships
-2. **Quiz Management**: Enhanced with scoring templates, assigned users, and question images
+1. **User Management**: Complete CRUD with key-based service/location assignment
+2. **Quiz Management**: Enhanced with key-based targeting and auto-assignment
 3. **Question Management**: Full CRUD implementation with image support
 4. **Image Management**: Question-level image associations with external file server integration
 5. **JWT Security**: 7-day token expiration with multiple concurrent session support
@@ -256,14 +271,14 @@ const handleExpiredToken = () => {
 - `POST /api/auth/change-password` - Change user password
 - `POST /api/auth/logout` - User logout
 
-### User Management *(Enhanced with Service & Location Auto-Assignment + Filtering & Sorting)*
-- `POST /api/users` - Create user with serviceId and locationId *(superadmin only)*
+### User Management *(Enhanced with Key-Based Service & Location Storage + Filtering & Sorting)*
+- `POST /api/users` - Create user with serviceKey and locationKey strings *(superadmin only)*
 - `GET /api/users` - Get all users with pagination, search, filtering, and sorting *(superadmin only)*
-  - **Filters**: `serviceId`, `locationId`, `role`, `search` (name/email)
+  - **Filters**: `serviceKey`, `locationKey`, `role`, `search` (name/email)
   - **Sorting**: `sortBy` (name, email, role, createdAt, updatedAt), `sortOrder` (ASC/DESC)
-  - **Enhanced Response**: Includes actual service and location names (not just IDs)
+  - **Enhanced Response**: Includes service and location display names from config lookup
 - `GET /api/users/:id` - Get user detail with auto-assigned quizzes and service/location data *(superadmin/admin)*
-- `PUT /api/users/:id` - Update user with service/location (triggers auto-assignment) *(superadmin only)*
+- `PUT /api/users/:id` - Update user with serviceKey/locationKey (triggers auto-assignment) *(superadmin only)*
 - `DELETE /api/users/:id` - Delete user *(superadmin only)*
 
 ### User Quiz Assignment Management *(Auto-Assignment System)*
@@ -273,14 +288,14 @@ const handleExpiredToken = () => {
 - `DELETE /api/user-quiz-assignments/:id` - Remove user-quiz assignment (manual only)
 - **Note**: Assignments are automatically created/updated based on service and location matching
 
-### Quiz Management *(Enhanced with Service & Location Auto-Assignment + Filtering & Sorting)*
-- `POST /api/quizzes` - Create quiz with serviceId and locationId (auto-assigns users) *(admin/superadmin)*
+### Quiz Management *(Enhanced with Key-Based Service & Location Storage + Filtering & Sorting)*
+- `POST /api/quizzes` - Create quiz with serviceKey and locationKey strings (auto-assigns users) *(admin/superadmin)*
 - `GET /api/quizzes` - Get quizzes with pagination, search, filtering, and sorting *(admin/superadmin)*
-  - **Filters**: `serviceId`, `locationId`, `isActive`, `search` (title/description)
+  - **Filters**: `serviceKey`, `locationKey`, `isActive`, `search` (title/description)
   - **Sorting**: `sortBy` (title, startDateTime, endDateTime, createdAt, updatedAt, passingScore), `sortOrder` (ASC/DESC)
-  - **Enhanced Response**: Includes actual service and location names with complete relational data
+  - **Enhanced Response**: Includes service and location display names with complete data
 - `GET /api/quizzes/:id` - Get quiz detail with questions, scoring, and auto-assigned users *(admin/superadmin)*
-- `PUT /api/quizzes/:id` - Update quiz with service/location (triggers auto-assignment) *(admin/superadmin)*
+- `PUT /api/quizzes/:id` - Update quiz with serviceKey/locationKey (triggers auto-assignment) *(admin/superadmin)*
 - `DELETE /api/quizzes/:id` - Delete quiz *(admin/superadmin, must have access)*
 - `GET /api/quizzes/public/:token` - Get published quiz by token *(public access, no authentication required)*
 - `GET /api/quizzes/:id/questions` - Get quiz questions
@@ -417,16 +432,18 @@ npm run seed:comprehensive
 - **AM Quiz**: 3 questions (multiple-choice, multiple-select, text)
 - **Tech Quiz**: 2 questions (multiple-choice, multiple-select)
 
-#### Auto-Assignments
-- Automatic quiz assignments based on service and location matching
-- Admins with matching service and location get auto-assigned to relevant quizzes
+#### Auto-Assignments (Key-Based)
+- Automatic quiz assignments based on serviceKey and locationKey string matching
+- Admins with matching service and location keys get auto-assigned to relevant quizzes
+- Direct string comparison for fast assignment logic
 
-### Seeder Features
+### Seeder Features (Updated for Key-Based Storage)
 1. **Incremental Seeding**: Skips seeding if data already exists
-2. **Relational Integrity**: Proper foreign key relationships
-3. **Realistic Data**: Indonesian locations, meaningful quiz content
-4. **Auto-Assignment Demo**: Shows service/location-based assignment system
+2. **Key-Based Assignment**: Users and quizzes use direct serviceKey/locationKey storage
+3. **Realistic Data**: Indonesian locations, meaningful quiz content with key-based targeting
+4. **Auto-Assignment Demo**: Shows enhanced key-based assignment system performance
 5. **Password Hashing**: All users have bcrypt-hashed passwords (`password123`)
+6. **Config Display**: Config items created for dropdown options and display names
 
 ### Sample Login Credentials
 ```
@@ -456,12 +473,12 @@ Regular User:
 - Access: Published quizzes only
 ```
 
-### Testing the Auto-Assignment System
-1. **Login as superadmin** to see all quizzes
-2. **Login as admin.sm@gms.com** to see only SM quizzes for Jakarta Pusat
-3. **Create a new quiz** with specific service/location to test auto-assignment
-4. **Update user service/location** to see assignment changes
-5. **Use filtering/sorting** to test the enhanced table features
+### Testing the Key-Based Auto-Assignment System
+1. **Login as superadmin** to see all quizzes (serviceKey='all_services', locationKey='all_locations')
+2. **Login as admin.sm@gms.com** to see only SM quizzes for Jakarta Pusat (serviceKey='sm', locationKey='jakarta_pusat')
+3. **Create a new quiz** with specific serviceKey/locationKey to test key-based auto-assignment
+4. **Update user serviceKey/locationKey** to see instant assignment changes via direct string matching
+5. **Use filtering/sorting** with serviceKey/locationKey parameters to test enhanced performance
 
 ## � Advanced Filtering & Sorting System
 
@@ -487,11 +504,11 @@ Each endpoint supports specific filters relevant to its data:
 
 #### Users Endpoint (`/api/users`)
 ```typescript
-GET /api/users?page=1&limit=10&search=admin&serviceId=1&locationId=2&role=admin&sortBy=name&sortOrder=ASC
+GET /api/users?page=1&limit=10&search=admin&serviceKey=sm&locationKey=jakarta_pusat&role=admin&sortBy=name&sortOrder=ASC
 
 // Available filters:
-serviceId: number     // Filter by service ID
-locationId: number    // Filter by location ID  
+serviceKey: string    // Filter by service key ('sm', 'am', 'tech_support', etc.)
+locationKey: string   // Filter by location key ('jakarta_pusat', 'jakarta_utara', etc.)
 role: string         // Filter by user role (admin, user, superadmin)
 search: string       // Search in name and email fields
 
@@ -508,17 +525,15 @@ sortBy: 'name' | 'email' | 'role' | 'createdAt' | 'updatedAt'
         "name": "John Doe",
         "email": "john@example.com", 
         "role": "admin",
-        "serviceId": 1,
-        "locationId": 2,
+        "serviceKey": "sm",
+        "locationKey": "jakarta_pusat",
         "service": {
-          "id": 1,
-          "key": "service_management", 
+          "key": "sm", 
           "value": "Service Management (SM)"
         },
         "location": {
-          "id": 2,
-          "key": "jakarta_utara",
-          "value": "Jakarta Utara"
+          "key": "jakarta_pusat",
+          "value": "Jakarta Pusat"
         },
         "createdAt": "2024-01-01T00:00:00.000Z"
       }
@@ -530,11 +545,11 @@ sortBy: 'name' | 'email' | 'role' | 'createdAt' | 'updatedAt'
 
 #### Quizzes Endpoint (`/api/quizzes`)
 ```typescript
-GET /api/quizzes?serviceId=1&locationId=2&isActive=true&search=javascript&sortBy=title&sortOrder=ASC
+GET /api/quizzes?serviceKey=sm&locationKey=jakarta_pusat&isActive=true&search=javascript&sortBy=title&sortOrder=ASC
 
 // Available filters:
-serviceId: number     // Filter by service ID
-locationId: number    // Filter by location ID
+serviceKey: string    // Filter by service key ('sm', 'am', 'tech_support', etc.)
+locationKey: string   // Filter by location key ('jakarta_pusat', 'jakarta_utara', etc.)
 isActive: boolean     // Filter by active status
 search: string       // Search in title and description
 
@@ -542,7 +557,7 @@ search: string       // Search in title and description
 sortBy: 'title' | 'startDateTime' | 'endDateTime' | 'createdAt' | 'updatedAt' | 'passingScore'
 // Default: createdAt DESC
 
-// Enhanced response includes service/location names
+// Enhanced response includes service/location names from config lookup
 ```
 
 #### Config Items Endpoint (`/api/config`)
@@ -581,7 +596,7 @@ sortBy: 'participantName' | 'email' | 'score' | 'submittedAt' | 'createdAt'
 #### Complex Filtering & Sorting
 ```bash
 # Find admins in Service Management at Jakarta Pusat, sorted by name
-GET /api/users?role=admin&serviceId=1&locationId=2&sortBy=name&sortOrder=ASC
+GET /api/users?role=admin&serviceKey=sm&locationKey=jakarta_pusat&sortBy=name&sortOrder=ASC
 
 # Find active quizzes with "javascript" in title, sorted by start date
 GET /api/quizzes?isActive=true&search=javascript&sortBy=startDateTime&sortOrder=DESC
@@ -619,28 +634,35 @@ const buildQueryParams = (filters: any, sorting: any, pagination: any) => {
 };
 
 // Example usage
-const filters = { serviceId: 1, role: 'admin', search: 'john' };
+const filters = { serviceKey: 'sm', role: 'admin', search: 'john' };
 const sorting = { field: 'name', direction: 'ASC' };  
 const pagination = { page: 1, limit: 10 };
 
 const queryString = buildQueryParams(filters, sorting, pagination);
-// Result: "page=1&limit=10&serviceId=1&role=admin&search=john&sortBy=name&sortOrder=ASC"
+// Result: "page=1&limit=10&serviceKey=sm&role=admin&search=john&sortBy=name&sortOrder=ASC"
 
 fetch(`/api/users?${queryString}`);
 ```
 
 ## �🚀 Enhanced Features & Updates
 
-### 1. Enhanced User & Quiz Management with Service/Location Display
+### 1. Key-Based Storage Architecture (November 2025)
+- **Direct Key Storage**: Users and quizzes store serviceKey/locationKey as strings instead of foreign keys
+- **Eliminated Relations**: Removed ManyToOne relations to ConfigItem entities for better performance
+- **String Matching**: Auto-assignment logic uses direct string comparison instead of JOIN operations
+- **Config Display**: ConfigItem table used only for UI display names, not for storage relations
+- **Enhanced Performance**: Faster queries and simplified data architecture
+
+### 2. Enhanced User & Quiz Management with Key-Based Service/Location
 - **User Details**: Enhanced `findOne` returns `UserDetailResponseDto` with `assignedQuizzes` array
 - **Quiz Details**: Enhanced `findOne` returns `QuizDetailResponseDto` with complete relations:
   - `questions` array with question images
   - `scoringTemplates` for assessment rules
   - `assignedUsers` for admin access control
-- **Create/Update Operations**: Support for relational data in single API calls
+- **Create/Update Operations**: Support for key-based service/location assignment
 - **Question Images**: Images moved from quiz-level to question-level for better organization
 
-### 2. JWT & Authentication Improvements  
+### 3. JWT & Authentication Improvements  
 - **7-Day Token Expiration**: Extended from 24h to 7d for better user experience
 - **Multiple Concurrent Sessions**: Same account can be used on multiple devices simultaneously
 - **Enhanced Token Payload**: Includes user role and assignment information
@@ -876,16 +898,16 @@ Response:
    - Pagination support to handle large datasets
    - Efficient relation loading with select optimization
 
-### 🚀 Ready-to-Use Endpoints
+### 🚀 Ready-to-Use Endpoints (Key-Based Storage)
 
-All endpoints now support the enhanced filtering and sorting:
+All endpoints now support key-based filtering and enhanced performance:
 
 ```bash
-# Users with comprehensive filtering
-GET /api/users?serviceId=1&locationId=2&role=admin&search=john&sortBy=name&sortOrder=ASC
+# Users with key-based comprehensive filtering
+GET /api/users?serviceKey=sm&locationKey=jakarta_pusat&role=admin&search=john&sortBy=name&sortOrder=ASC
 
-# Quizzes with service/location filtering  
-GET /api/quizzes?serviceId=1&isActive=true&search=javascript&sortBy=startDateTime&sortOrder=DESC
+# Quizzes with key-based service/location filtering  
+GET /api/quizzes?serviceKey=sm&isActive=true&search=javascript&sortBy=startDateTime&sortOrder=DESC
 
 # Config items for dropdowns
 GET /api/config/services  # Service dropdown options
@@ -895,14 +917,44 @@ GET /api/config/locations # Location dropdown options
 GET /api/attempts?quizId=1&email=user@example.com&sortBy=score&sortOrder=DESC
 ```
 
-### 📁 Project Files Updated
+### 📁 Project Files Updated (Key-Based Migration)
 
-- **Controllers**: UserController, QuizController, ConfigController, AttemptController
-- **Services**: UserService, QuizService, ConfigService, AttemptService  
-- **Entities**: User entity enhanced with service/location relations
-- **DTOs**: UserResponseDto, QuizResponseDto enhanced with service/location data
-- **Seeders**: New ComprehensiveSeeder with realistic sample data
-- **Documentation**: Complete API documentation with filtering examples
+- **Entities**: User and Quiz entities converted to key-based storage (serviceKey/locationKey)
+- **Controllers**: Updated to accept key-based query parameters instead of IDs
+- **Services**: UserService, QuizService, AutoAssignmentService converted to use string keys
+- **DTOs**: Updated to use string validation for serviceKey/locationKey fields
+- **Database Migration**: `UpdateToKeyBasedStorage1762772417800` - successful ID-to-key data conversion
+- **Seeders**: ComprehensiveSeeder updated to create key-based sample data
+- **Documentation**: Complete API documentation updated for key-based architecture
+
+### 🗄️ Database Migration Summary
+
+#### Migration: UpdateToKeyBasedStorage1762772417800
+**Purpose**: Convert from foreign key relations to direct string key storage
+
+**Changes Made**:
+1. **User Entity Schema**:
+   - Added `serviceKey` (string) and `locationKey` (string) columns
+   - Migrated existing `serviceId`/`locationId` data to corresponding keys
+   - Removed foreign key constraints to `config_items`
+
+2. **Quiz Entity Schema**:
+   - Added `serviceKey` (string) and `locationKey` (string) columns  
+   - Migrated existing `serviceId`/`locationId` data to corresponding keys
+   - Created indexes on new key columns for performance
+
+3. **Data Conversion**:
+   - Successfully converted all existing user and quiz records
+   - Mapped service IDs to keys: 1→'sm', 2→'am', 3→'tech_support', etc.
+   - Mapped location IDs to keys: 1→'jakarta_pusat', 2→'jakarta_utara', etc.
+   - No data loss during migration
+
+**Benefits**:
+- ✅ Eliminated complex JOIN operations 
+- ✅ Faster query performance with direct string matching
+- ✅ Simplified auto-assignment logic
+- ✅ Reduced database complexity
+- ✅ Better scalability for large datasets
 
 ### 🎯 Next Steps for Frontend Implementation
 

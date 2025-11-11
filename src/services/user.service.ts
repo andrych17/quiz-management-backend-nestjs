@@ -40,19 +40,19 @@ export class UserService {
         ...createUserDto,
         password: hashedPassword,
         role: (createUserDto.role || DEFAULTS.USER_ROLE as UserRole) as 'admin' | 'user',
-        locationId: createUserDto.locationId,
-        serviceId: createUserDto.serviceId,
+        locationKey: createUserDto.locationKey,
+        serviceKey: createUserDto.serviceKey,
       });
 
       const savedUser = await this.userRepository.save(user);
 
       // Auto-assign to quizzes based on service and location (for admin users)
-      if ((createUserDto.serviceId || createUserDto.locationId) && savedUser.role === 'admin') {
+      if ((createUserDto.serviceKey || createUserDto.locationKey) && savedUser.role === 'admin') {
         // Auto-assign user to all existing quizzes matching their service and location
         await this.autoAssignmentService.updateUserServiceLocationAssignments(
           savedUser.id,
-          createUserDto.serviceId,
-          createUserDto.locationId,
+          createUserDto.serviceKey,
+          createUserDto.locationKey,
           null, // No old service since this is new user
           null  // No old location since this is new user
         );
@@ -100,44 +100,36 @@ export class UserService {
     page: number = 1,
     limit: number = 10,
     search?: string,
-    serviceId?: number,
-    locationId?: number,
+    serviceKey?: string,
+    locationKey?: string,
     role?: string,
     sortBy: string = 'createdAt',
     sortOrder: 'ASC' | 'DESC' = 'DESC'
   ): Promise<{ items: UserResponseDto[], pagination: { currentPage: number, totalPages: number, pageSize: number, totalItems: number, hasNext: boolean, hasPrevious: boolean } }> {
     const skip = (page - 1) * limit;
     
-    // Use query builder for complex joins and filtering
+    // Use query builder for filtering (no joins needed with key-based storage)
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.service', 'service')
-      .leftJoinAndSelect('user.location', 'location')
       .select([
         'user.id',
         'user.name', 
         'user.email',
         'user.role',
-        'user.serviceId',
-        'user.locationId',
+        'user.serviceKey',
+        'user.locationKey',
         'user.createdAt',
-        'user.updatedAt',
-        'service.id',
-        'service.key',
-        'service.value',
-        'location.id', 
-        'location.key',
-        'location.value'
+        'user.updatedAt'
       ]);
 
     // Add service filter
-    if (serviceId) {
-      queryBuilder.andWhere('user.serviceId = :serviceId', { serviceId });
+    if (serviceKey) {
+      queryBuilder.andWhere('user.serviceKey = :serviceKey', { serviceKey });
     }
     
     // Add location filter
-    if (locationId) {
-      queryBuilder.andWhere('user.locationId = :locationId', { locationId });
+    if (locationKey) {
+      queryBuilder.andWhere('user.locationKey = :locationKey', { locationKey });
     }
     
     // Add role filter
@@ -175,21 +167,34 @@ export class UserService {
       hasPrevious: page > 1,
     };
 
+    // Get config items for display
+    const serviceConfigs = await this.configItemRepository.find({
+      where: { group: 'service' }
+    });
+    const locationConfigs = await this.configItemRepository.find({
+      where: { group: 'location' }
+    });
+
     return {
-      items: users.map(user => ({
-        ...user,
-        role: user.role as UserRole,
-        service: user.service ? {
-          id: user.service.id,
-          key: user.service.key,
-          value: user.service.value
-        } : null,
-        location: user.location ? {
-          id: user.location.id,
-          key: user.location.key,
-          value: user.location.value
-        } : null,
-      })),
+      items: users.map(user => {
+        const serviceConfig = user.serviceKey ? serviceConfigs.find(s => s.key === user.serviceKey) : null;
+        const locationConfig = user.locationKey ? locationConfigs.find(l => l.key === user.locationKey) : null;
+        
+        return {
+          ...user,
+          role: user.role as UserRole,
+          service: serviceConfig ? {
+            id: serviceConfig.id,
+            key: serviceConfig.key,
+            value: serviceConfig.value
+          } : null,
+          location: locationConfig ? {
+            id: locationConfig.id,
+            key: locationConfig.key,
+            value: locationConfig.value
+          } : null,
+        };
+      }),
       pagination,
     };
   }
@@ -197,12 +202,27 @@ export class UserService {
   async findOne(id: number): Promise<UserDetailResponseDto> {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['service', 'location'],
-      select: ['id', 'name', 'email', 'role', 'serviceId', 'locationId', 'createdAt', 'updatedAt'],
+      select: ['id', 'name', 'email', 'role', 'serviceKey', 'locationKey', 'createdAt', 'updatedAt'],
     });
 
     if (!user) {
       throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    // Get config items for service and location if they exist
+    let serviceConfig = null;
+    let locationConfig = null;
+
+    if (user.serviceKey) {
+      serviceConfig = await this.configItemRepository.findOne({
+        where: { group: 'service', key: user.serviceKey }
+      });
+    }
+
+    if (user.locationKey) {
+      locationConfig = await this.configItemRepository.findOne({
+        where: { group: 'location', key: user.locationKey }
+      });
     }
 
     let assignedQuizzes = [];
@@ -231,15 +251,15 @@ export class UserService {
     return {
       ...user,
       role: user.role as UserRole,
-      service: user.service ? {
-        id: user.service.id,
-        key: user.service.key,
-        value: user.service.value
+      service: serviceConfig ? {
+        id: serviceConfig.id,
+        key: serviceConfig.key,
+        value: serviceConfig.value
       } : null,
-      location: user.location ? {
-        id: user.location.id,
-        key: user.location.key,
-        value: user.location.value
+      location: locationConfig ? {
+        id: locationConfig.id,
+        key: locationConfig.key,
+        value: locationConfig.value
       } : null,
       assignedQuizzes,
     };
@@ -272,10 +292,10 @@ export class UserService {
     const userData = updateUserDto;
 
     // Handle service and location change for auto-assignment
-    const oldServiceId = user.serviceId;
-    const oldLocationId = user.locationId;
-    const newServiceId = userData.serviceId;
-    const newLocationId = userData.locationId;
+    const oldServiceKey = user.serviceKey;
+    const oldLocationKey = user.locationKey;
+    const newServiceKey = userData.serviceKey;
+    const newLocationKey = userData.locationKey;
 
     // Update user
     const updateData: Partial<User> = {
@@ -288,13 +308,13 @@ export class UserService {
     // Handle auto-assignment based on service/location change (for admin users only)
     const updatedUser = await this.userRepository.findOne({ where: { id } });
     if (updatedUser?.role === 'admin' && 
-        (oldServiceId !== newServiceId || oldLocationId !== newLocationId)) {
+        (oldServiceKey !== newServiceKey || oldLocationKey !== newLocationKey)) {
       await this.autoAssignmentService.updateUserServiceLocationAssignments(
         id,
-        newServiceId,
-        newLocationId,
-        oldServiceId,
-        oldLocationId
+        newServiceKey,
+        newLocationKey,
+        oldServiceKey,
+        oldLocationKey
       );
     }
 

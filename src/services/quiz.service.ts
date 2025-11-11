@@ -65,8 +65,8 @@ export class QuizService {
         slug,
         token,
         quizType,
-        locationId: createQuizDto.locationId,
-        serviceId: createQuizDto.serviceId,
+        locationKey: createQuizDto.locationKey,
+        serviceKey: createQuizDto.serviceKey,
         passingScore: createQuizDto.passingScore,
         questionsPerPage: createQuizDto.questionsPerPage,
         durationMinutes: createQuizDto.durationMinutes,
@@ -99,11 +99,11 @@ export class QuizService {
       }
 
       // Auto-assign admin users based on service and location
-      if (savedQuiz.serviceId || savedQuiz.locationId) {
+      if (savedQuiz.serviceKey || savedQuiz.locationKey) {
         await this.autoAssignmentService.autoAssignUsersToQuiz(
           savedQuiz.id, 
-          savedQuiz.serviceId,
-          savedQuiz.locationId, 
+          savedQuiz.serviceKey,
+          savedQuiz.locationKey, 
           'system'
         );
       }
@@ -446,7 +446,8 @@ export class QuizService {
       token: generateToken(),
       isActive: false, // Start as inactive
       serviceType: originalQuiz.serviceType,
-      locationId: originalQuiz.locationId,
+      serviceKey: originalQuiz.serviceKey,
+      locationKey: originalQuiz.locationKey,
       passingScore: originalQuiz.passingScore,
       questionsPerPage: originalQuiz.questionsPerPage,
       startDateTime: originalQuiz.startDateTime,
@@ -689,7 +690,8 @@ export class QuizService {
       title: string;
       description?: string;
       serviceType?: ServiceType;
-      locationId?: number;
+      serviceKey?: string;
+      locationKey?: string;
     }
   ): Promise<QuizResponseDto> {
     // Get source quiz with all relations
@@ -713,7 +715,8 @@ export class QuizService {
         slug,
         token,
         serviceType: copyData.serviceType || sourceQuiz.serviceType,
-        locationId: copyData.locationId || sourceQuiz.locationId,
+        serviceKey: copyData.serviceKey || sourceQuiz.serviceKey,
+        locationKey: copyData.locationKey || sourceQuiz.locationKey,
         
         // Copy all settings from source
         passingScore: sourceQuiz.passingScore,
