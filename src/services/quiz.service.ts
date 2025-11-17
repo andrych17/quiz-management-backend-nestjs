@@ -208,8 +208,8 @@ export class QuizService {
     limit: number = 10,
     search?: string,
     isActive?: boolean,
-    serviceId?: number,
-    locationId?: number,
+    serviceKey?: string,
+    locationKey?: string,
     sortBy: string = 'createdAt',
     sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
@@ -220,9 +220,7 @@ export class QuizService {
       .createQueryBuilder('quiz')
       .leftJoinAndSelect('quiz.questions', 'questions')
       .leftJoinAndSelect('quiz.attempts', 'attempts')
-      .leftJoinAndSelect('quiz.scoringTemplates', 'scoringTemplates')
-      .leftJoinAndSelect('quiz.service', 'service')
-      .leftJoinAndSelect('quiz.location', 'location');
+      .leftJoinAndSelect('quiz.scoringTemplates', 'scoringTemplates');
 
     // Superadmin sees all quizzes
     if (userRole === 'superadmin') {
@@ -254,13 +252,13 @@ export class QuizService {
     }
 
     // Apply service filter
-    if (serviceId) {
-      queryBuilder.andWhere('quiz.serviceId = :serviceId', { serviceId });
+    if (serviceKey) {
+      queryBuilder.andWhere('quiz.serviceKey = :serviceKey', { serviceKey });
     }
 
     // Apply location filter
-    if (locationId) {
-      queryBuilder.andWhere('quiz.locationId = :locationId', { locationId });
+    if (locationKey) {
+      queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
     }
 
     // Validate sortBy field to prevent SQL injection
