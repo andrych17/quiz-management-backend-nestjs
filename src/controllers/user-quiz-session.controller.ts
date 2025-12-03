@@ -327,28 +327,5 @@ export class UserQuizSessionController {
     return await this.sessionService.getSessionStatistics(quizId);
   }
 
-  @Post('cleanup-expired')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Clean up expired sessions',
-    description:
-      'Mark expired sessions as expired status. Requires admin role.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Number of sessions cleaned up',
-    schema: {
-      type: 'object',
-      properties: {
-        cleanedUpCount: { type: 'number', example: 5 },
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async cleanupExpiredSessions() {
-    const count = await this.sessionService.cleanupExpiredSessions();
-    return { cleanedUpCount: count };
-  }
+
 }

@@ -10,8 +10,9 @@ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: process.env.NODE_ENV === 'production' ? ['error'] : ['log', 'debug', 'error', 'verbose', 'warn'],
-    bufferLogs: true,
+    logger: process.env.NODE_ENV === 'production' ? false : ['error', 'warn'],
+    bufferLogs: false,
+    abortOnError: false,
   });
 
   // Only serve static files in development or if needed

@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
 
 // Entities
 import { User } from './entities/user.entity';
@@ -43,8 +42,7 @@ import { SharedServicesModule } from './shared/shared-services.module';
 // Auth Module
 import { AuthModule } from './auth/auth.module';
 
-// Schedule Module
-import { ScheduleAppModule } from './schedule/schedule.module';
+
 
 import { databaseConfig } from './config/database.config';
 
@@ -54,8 +52,6 @@ import { databaseConfig } from './config/database.config';
       isGlobal: true,
       load: [databaseConfig],
     }),
-    // Only enable scheduler when explicitly enabled
-    ...(process.env.SCHEDULER_ENABLED === 'true' ? [ScheduleModule.forRoot()] : []),
     TypeOrmModule.forRootAsync({
       inject: [databaseConfig.KEY],
       useFactory: (config) => config,
@@ -74,7 +70,6 @@ import { databaseConfig } from './config/database.config';
     ]),
     SharedServicesModule,
     AuthModule,
-    ScheduleAppModule,
   ],
   controllers: [
     UserController,

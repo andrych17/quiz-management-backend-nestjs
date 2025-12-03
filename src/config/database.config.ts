@@ -43,11 +43,13 @@ export const databaseConfig = registerAs(
     ssl: process.env.DATABASE_SSL === 'true' ? {
       rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false'
     } : false,
-    // Connection pooling for production
+    // Optimized connection pooling for low memory environments
     extra: process.env.NODE_ENV === 'production' ? {
-      max: 10,
-      connectionTimeoutMillis: 30000,
-      idleTimeoutMillis: 30000,
+      max: 3,
+      min: 1,
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 10000,
+      acquireTimeoutMillis: 10000,
     } : {},
   }),
 );

@@ -475,33 +475,7 @@ export class UserQuizSessionService {
     });
   }
 
-  async cleanupExpiredSessions(): Promise<number> {
-    const now = new Date();
 
-    // Find all sessions that should be expired
-    const expiredSessions = await this.sessionRepository
-      .createQueryBuilder('session')
-      .where('session.expiresAt IS NOT NULL')
-      .andWhere('session.expiresAt < :now', { now })
-      .andWhere('session.sessionStatus != :expired', {
-        expired: SessionStatus.EXPIRED,
-      })
-      .getMany();
-
-    if (expiredSessions.length === 0) {
-      return 0;
-    }
-
-    // Update them to expired status
-    await this.sessionRepository
-      .createQueryBuilder()
-      .update(UserQuizSession)
-      .set({ sessionStatus: SessionStatus.EXPIRED })
-      .where('id IN (:...ids)', { ids: expiredSessions.map((s) => s.id) })
-      .execute();
-
-    return expiredSessions.length;
-  }
 
   async getSessionStatistics(quizId: number): Promise<{
     totalSessions: number;
