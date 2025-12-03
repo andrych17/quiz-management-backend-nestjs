@@ -54,7 +54,8 @@ import { databaseConfig } from './config/database.config';
       isGlobal: true,
       load: [databaseConfig],
     }),
-    ScheduleModule.forRoot(),
+    // Only enable scheduler when explicitly enabled
+    ...(process.env.SCHEDULER_ENABLED === 'true' ? [ScheduleModule.forRoot()] : []),
     TypeOrmModule.forRootAsync({
       inject: [databaseConfig.KEY],
       useFactory: (config) => config,

@@ -37,12 +37,18 @@ export const databaseConfig = registerAs(
     ],
     migrations: ['dist/migrations/*.js'],
     synchronize: process.env.DATABASE_SYNCHRONIZE === 'true' || false,
-    logging: process.env.DATABASE_LOGGING === 'true' || false,
+    logging: process.env.NODE_ENV === 'production' ? false : (process.env.DATABASE_LOGGING === 'true' || false),
     migrationsRun: true,
     autoLoadEntities: true,
     ssl: process.env.DATABASE_SSL === 'true' ? {
       rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false'
     } : false,
+    // Connection pooling for production
+    extra: process.env.NODE_ENV === 'production' ? {
+      max: 10,
+      connectionTimeoutMillis: 30000,
+      idleTimeoutMillis: 30000,
+    } : {},
   }),
 );
 

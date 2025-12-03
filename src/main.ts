@@ -10,13 +10,16 @@ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: process.env.NODE_ENV === 'production' ? ['error', 'warn'] : ['log', 'debug', 'error', 'verbose', 'warn'],
+    logger: process.env.NODE_ENV === 'production' ? ['error'] : ['log', 'debug', 'error', 'verbose', 'warn'],
+    bufferLogs: true,
   });
 
-  // Serve static files from uploads directory
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads/',
-  });
+  // Only serve static files in development or if needed
+  if (process.env.NODE_ENV !== 'production') {
+    app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+      prefix: '/uploads/',
+    });
+  }
 
   // Global pipes, interceptors, and filters
   app.useGlobalPipes(
