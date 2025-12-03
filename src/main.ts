@@ -33,10 +33,21 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
 
+  // Handle favicon requests
+  app.use('/favicon.ico', (req, res) => {
+    res.status(204).end();
+  });
+
   // Enable CORS for frontend
   app.enableCors({
-    origin: [APP_URLS.FRONTEND_URL], // Next.js frontend URL from constants
+    origin: [
+      'http://localhost:3000', // Development
+      'https://quiz-app-nine-rho-70.vercel.app', // Production frontend
+      'https://quiz.gms.com', // Custom domain if any
+    ],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Swagger configuration (only in development)

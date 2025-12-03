@@ -15,6 +15,7 @@ import { QuizScoring } from './entities/quiz-scoring.entity';
 import { UserQuizSession } from './entities/user-quiz-session.entity';
 
 // Controllers
+import { AppController } from './app.controller';
 import { UserController } from './controllers/user.controller';
 import { QuizController } from './controllers/quiz.controller';
 import { QuestionController } from './controllers/question.controller';
@@ -26,6 +27,7 @@ import { UserQuizAssignmentController } from './controllers/user-quiz-assignment
 import { PublicController } from './controllers/public.controller';
 
 // Services
+import { AppService } from './app.service';
 import { QuizService } from './services/quiz.service';
 import { QuestionService } from './services/question.service';
 import { AttemptService } from './services/attempt.service';
@@ -72,6 +74,7 @@ import { databaseConfig } from './config/database.config';
     AuthModule,
   ],
   controllers: [
+    AppController,
     UserController,
     QuizController,
     QuestionController,
@@ -83,6 +86,7 @@ import { databaseConfig } from './config/database.config';
     PublicController,
   ],
   providers: [
+    AppService,
     QuizService,
     QuestionService,
     AttemptService,
