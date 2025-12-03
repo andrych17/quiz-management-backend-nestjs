@@ -9,7 +9,9 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: process.env.NODE_ENV === 'production' ? ['error', 'warn'] : ['log', 'debug', 'error', 'verbose', 'warn'],
+  });
 
   // Serve static files from uploads directory
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
@@ -33,30 +35,33 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Swagger configuration
-  const config = new DocumentBuilder()
-    .setTitle('Quiz Application API')
-    .setDescription(
-      'Complete API documentation for Quiz Application with CRUD operations',
-    )
-    .setVersion('1.0')
-    .addTag('auth', 'Authentication endpoints')
-    .addTag('users', 'User management')
-    .addTag('quizzes', 'Quiz management')
-    .addTag('questions', 'Question management')
-    .addTag('attempts', 'Quiz attempts')
-    .addTag('config', 'Configuration items')
-    .addBearerAuth()
-    .build();
+  // Swagger configuration (only in development)
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Quiz Application API')
+      .setDescription(
+        'Complete API documentation for Quiz Application with CRUD operations',
+      )
+      .setVersion('1.0')
+      .addTag('auth', 'Authentication endpoints')
+      .addTag('users', 'User management')
+      .addTag('quizzes', 'Quiz management')
+      .addTag('questions', 'Question management')
+      .addTag('attempts', 'Quiz attempts')
+      .addTag('config', 'Configuration items')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = process.env.PORT || process.env.APP_PORT || 3001;
   await app.listen(port, '0.0.0.0');
 
-  console.log(`Application is running on port: ${port}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🚀 Application is running on: http://0.0.0.0:${port}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🎯 Port: ${port}`);
   
   // Only log URLs in development
   if (process.env.NODE_ENV !== 'production') {
