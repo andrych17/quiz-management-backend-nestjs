@@ -2,15 +2,17 @@ import {
   Entity,
   Column,
   PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   JoinColumn,
   Index,
 } from 'typeorm';
-import { Question } from './question.entity';
 import { Attempt } from './attempt.entity';
+import { Question } from './question.entity';
 
 @Entity('attempt_answers')
-@Index(['attemptId', 'questionId'])
+@Index(['attemptId', 'questionId'], { unique: true })
 export class AttemptAnswer {
   @PrimaryGeneratedColumn()
   id: number;
@@ -21,23 +23,24 @@ export class AttemptAnswer {
   @Column()
   questionId: number;
 
-  @Column({ name: 'answerText', type: 'text' })
+  @Column({ type: 'text' })
   answerText: string;
 
-  @Column({ name: 'selectedOption', nullable: true })
-  selectedOption: number;
+  @Column({ nullable: true })
+  isCorrect: boolean;
 
-  @Column({ type: 'jsonb', name: 'selectedOptions', nullable: true })
-  selectedOptions: number[];
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   // Relations
   @ManyToOne(() => Attempt, (attempt) => attempt.answers, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'attemptId' })
   attempt: Attempt;
 
-  @ManyToOne(() => Question, (question) => question.answers, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(() => Question, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'questionId' })
   question: Question;
 }

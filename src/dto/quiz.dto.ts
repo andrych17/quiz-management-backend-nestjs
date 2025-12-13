@@ -64,25 +64,18 @@ export class CreateQuestionForQuizDto {
 }
 
 export class CreateScoringTemplateForQuizDto {
-  @ApiProperty({ example: 0, description: 'Minimum score for this grade' })
+  @ApiProperty({ example: 0, description: 'Jumlah jawaban benar' })
   @IsNotEmpty()
   @IsNumber()
-  minScore: number;
-
-  @ApiProperty({ example: 100, description: 'Maximum score for this grade' })
-  @IsNotEmpty()
-  @IsNumber()
-  maxScore: number;
-
-  @ApiProperty({ example: 'A', description: 'Grade label' })
-  @IsNotEmpty()
-  @IsString()
-  grade: string;
+  correctAnswers: number;
 
   @ApiPropertyOptional({
-    example: 'Excellent performance',
-    description: 'Grade description',
+    example: 1,
+    description: 'Point per jawaban benar (default 1, score = correctAnswers × points)',
   })
+  @IsOptional()
+  @IsNumber()
+  points?: number;
   @IsOptional()
   @IsString()
   description?: string;
@@ -346,10 +339,8 @@ export class UpdateQuizDto {
   @IsOptional()
   scoringTemplates?: Array<{
     id?: number;
-    minScore: number;
-    maxScore: number;
-    grade: string;
-    description?: string;
+    correctAnswers: number;
+    points?: number;
   }>;
 
   @ApiPropertyOptional({

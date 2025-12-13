@@ -21,8 +21,6 @@ import { QuizController } from './controllers/quiz.controller';
 import { QuestionController } from './controllers/question.controller';
 import { AttemptController } from './controllers/attempt.controller';
 import { ConfigController } from './controllers/config.controller';
-import { UserQuizSessionController } from './controllers/user-quiz-session.controller';
-import { AttemptAnswerController } from './controllers/attempt-answer.controller';
 import { UserQuizAssignmentController } from './controllers/user-quiz-assignment.controller';
 import { PublicController } from './controllers/public.controller';
 
@@ -32,8 +30,6 @@ import { QuizService } from './services/quiz.service';
 import { QuestionService } from './services/question.service';
 import { AttemptService } from './services/attempt.service';
 import { UrlShortenerService } from './services/url-shortener.service';
-import { UserQuizSessionService } from './services/user-quiz-session.service';
-import { AttemptAnswerService } from './services/attempt-answer.service';
 import { UserQuizAssignmentService } from './services/user-quiz-assignment.service';
 import { UrlGeneratorService } from './services/url-generator.service';
 import { FileUploadService } from './services/file-upload.service';
@@ -80,9 +76,7 @@ import { databaseConfig } from './config/database.config';
     QuestionController,
     AttemptController,
     ConfigController,
-    AttemptAnswerController,
     UserQuizAssignmentController,
-    UserQuizSessionController,
     PublicController,
   ],
   providers: [
@@ -91,9 +85,7 @@ import { databaseConfig } from './config/database.config';
     QuestionService,
     AttemptService,
     UrlShortenerService,
-    AttemptAnswerService,
     UserQuizAssignmentService,
-    UserQuizSessionService,
     UrlGeneratorService,
     FileUploadService,
   ],

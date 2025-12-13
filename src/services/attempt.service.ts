@@ -389,11 +389,10 @@ export class AttemptService {
   ) {
     const skip = (page - 1) * limit;
     
-    // Build query
+    // Build query - simplified tanpa leftJoinAndSelect answers
     const queryBuilder = this.attemptRepository
       .createQueryBuilder('attempt')
-      .leftJoinAndSelect('attempt.quiz', 'quiz')
-      .leftJoinAndSelect('attempt.answers', 'answers');
+      .leftJoinAndSelect('attempt.quiz', 'quiz');
 
     // Filter by quiz if specified
     if (quizId) {
@@ -442,7 +441,7 @@ export class AttemptService {
     // Get config mappings for display names
     const mappings = await this.configService.getMappings();
 
-    // Transform data with display names
+    // Transform data with display names - simplified response
     const transformedAttempts = attempts.map((attempt) => ({
       id: attempt.id,
       participantName: attempt.participantName,
@@ -459,13 +458,13 @@ export class AttemptService {
         ? mappings.locations.mapping[attempt.quiz.locationKey] || attempt.quiz.locationKey 
         : 'No Location',
       score: attempt.score,
+      correctAnswers: attempt.correctAnswers,
+      totalQuestions: attempt.totalQuestions,
       grade: attempt.grade,
       passed: attempt.passed,
       startedAt: attempt.startedAt,
       completedAt: attempt.completedAt,
       submittedAt: attempt.submittedAt,
-      totalAnswers: attempt.answers?.length || 0,
-      correctAnswers: attempt.answers?.filter(a => a.answerText === a.question?.correctAnswer).length || 0,
       createdAt: attempt.createdAt,
       updatedAt: attempt.updatedAt,
     }));
@@ -533,8 +532,6 @@ export class AttemptService {
         questionType: answer.question?.questionType || 'unknown',
         questionOptions: answer.question?.options || [],
         answerText: answer.answerText,
-        selectedOption: answer.selectedOption,
-        selectedOptions: answer.selectedOptions,
         correctAnswer: answer.question?.correctAnswer || '',
         isCorrect: answer.answerText === answer.question?.correctAnswer,
       })),

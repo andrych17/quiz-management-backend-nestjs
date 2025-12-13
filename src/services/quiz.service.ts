@@ -123,25 +123,41 @@ export class QuizService {
         createQuizDto.scoringTemplates &&
         createQuizDto.scoringTemplates.length > 0
       ) {
+        // Validasi: pastikan scoring templates mencakup semua kemungkinan correctAnswers
+        const totalQuestions = createQuizDto.questions?.length || 0;
+        if (totalQuestions > 0) {
+          const correctAnswersSet = new Set(
+            createQuizDto.scoringTemplates.map(t => t.correctAnswers)
+          );
+          
+          // Check apakah ada yang terlewat
+          const missing = [];
+          for (let i = 0; i <= totalQuestions; i++) {
+            if (!correctAnswersSet.has(i)) {
+              missing.push(i);
+            }
+          }
+          
+          if (missing.length > 0) {
+            throw new BadRequestException(
+              `Template penilaian tidak lengkap. Belum ada template untuk: ${missing.join(', ')} jawaban benar. ` +
+              `Quiz memiliki ${totalQuestions} soal, harus ada template untuk 0 sampai ${totalQuestions} jawaban benar.`
+            );
+          }
+        }
+        
         const scoringTemplates = createQuizDto.scoringTemplates.map(
           (templateData) =>
             this.quizScoringRepository.create({
               quizId: savedQuiz.id,
-              scoringName: templateData.grade || 'Default Grade',
-              correctAnswerPoints: 1, // 1 point per jawaban benar (standard)
-              incorrectAnswerPenalty: 0,
-              unansweredPenalty: 0,
-              bonusPoints: 0,
-              multiplier: 1.0,
-              timeBonusEnabled: false,
-              maxScore: templateData.maxScore, // Max score untuk grade ini (dalam %)
-              minScore: templateData.minScore, // Min score untuk grade ini (dalam %)
-              passingScore: createQuizDto.passingScore,
+              correctAnswers: templateData.correctAnswers,
+              points: templateData.points || 1,
               isActive: true,
               createdBy: userInfo?.email || userInfo?.name || 'system',
               updatedBy: userInfo?.email || userInfo?.name || 'system',
             }),
         );
+        
         savedScoringTemplates =
           await this.quizScoringRepository.save(scoringTemplates);
       }
@@ -160,16 +176,9 @@ export class QuizService {
         for (let i = 0; i < createQuizDto.questions.length; i++) {
           const questionData = createQuizDto.questions[i];
           
-          console.log(`Validating question ${i}:`, {
-            correctAnswer: questionData.correctAnswer,
-            correctAnswerType: typeof questionData.correctAnswer,
-            correctAnswerTrimmed: questionData.correctAnswer ? questionData.correctAnswer.trim() : 'undefined',
-            questionType: questionData.questionType
-          });
-          
-          // Essay questions don't need correct answers
-          if (questionData.questionType !== 'essay' && (!questionData.correctAnswer || questionData.correctAnswer.trim() === '')) {
-            console.error(`Question ${i} validation failed:`, questionData);
+          // Text and essay questions don't need correct answers (open-ended)
+          const isOpenEnded = questionData.questionType === 'text' || questionData.questionType === 'essay';
+          if (!isOpenEnded && (!questionData.correctAnswer || questionData.correctAnswer.trim() === '')) {
             throw new BadRequestException(`Question ${i + 1}: correctAnswer is required and cannot be empty`);
           }
           
@@ -502,8 +511,8 @@ export class QuizService {
       // Check if quiz has attempts - cannot edit questions if quiz has been taken
       if (quiz.attempts && quiz.attempts.length > 0) {
         throw new BadRequestException(
-          'Cannot update questions for a quiz that has already been taken. ' +
-            'This ensures fairness and data integrity for existing quiz results.',
+          'Tidak dapat mengubah soal untuk quiz yang sudah dikerjakan oleh peserta. ' +
+            'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
         );
       }
 
@@ -566,6 +575,39 @@ export class QuizService {
 
     // Handle scoring templates update (grade range)
     if (scoringTemplates !== undefined) {
+      // Check if quiz has attempts - cannot edit scoring if quiz has been taken
+      if (quiz.attempts && quiz.attempts.length > 0) {
+        throw new BadRequestException(
+          'Tidak dapat mengubah template penilaian untuk quiz yang sudah dikerjakan oleh peserta. ' +
+            'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
+        );
+      }
+      
+      // Validasi: pastikan scoring templates mencakup semua kemungkinan correctAnswers
+      if (scoringTemplates.length > 0) {
+        const totalQuestions = quiz.questions?.length || 0;
+        if (totalQuestions > 0) {
+          const correctAnswersSet = new Set(
+            scoringTemplates.map(t => t.correctAnswers)
+          );
+          
+          // Check apakah ada yang terlewat
+          const missing = [];
+          for (let i = 0; i <= totalQuestions; i++) {
+            if (!correctAnswersSet.has(i)) {
+              missing.push(i);
+            }
+          }
+          
+          if (missing.length > 0) {
+            throw new BadRequestException(
+              `Template penilaian tidak lengkap. Belum ada template untuk: ${missing.join(', ')} jawaban benar. ` +
+              `Quiz memiliki ${totalQuestions} soal, harus ada template untuk 0 sampai ${totalQuestions} jawaban benar.`
+            );
+          }
+        }
+      }
+      
       // Delete existing scoring templates
       await this.quizScoringRepository.delete({ quizId: id });
 
@@ -574,16 +616,8 @@ export class QuizService {
         const newScoringTemplates = scoringTemplates.map((templateData) =>
           this.quizScoringRepository.create({
             quizId: id,
-            scoringName: templateData.grade || 'Updated Grade',
-            correctAnswerPoints: 1, // 1 point per jawaban benar (standard)
-            incorrectAnswerPenalty: 0,
-            unansweredPenalty: 0,
-            bonusPoints: 0,
-            multiplier: 1.0,
-            timeBonusEnabled: false,
-            maxScore: templateData.maxScore, // Max score untuk grade ini (dalam %)
-            minScore: templateData.minScore, // Min score untuk grade ini (dalam %)
-            passingScore: updateQuizDto.passingScore,
+            correctAnswers: templateData.correctAnswers,
+            points: templateData.points || 1,
             isActive: true,
             createdBy: userInfo?.email || userInfo?.name || 'system',
             updatedBy: userInfo?.email || userInfo?.name || 'system',
@@ -706,10 +740,21 @@ export class QuizService {
     normalUrl: string;
     shortUrl: string;
   }> {
-    const quiz = await this.quizRepository.findOne({ where: { id } });
+    const quiz = await this.quizRepository.findOne({ 
+      where: { id },
+      relations: ['attempts']
+    });
 
     if (!quiz) {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
+    }
+
+    // Check if quiz has attempts - cannot regenerate link if quiz has been taken
+    if (quiz.attempts && quiz.attempts.length > 0) {
+      throw new BadRequestException(
+        'Tidak dapat membuat ulang link untuk quiz yang sudah dikerjakan oleh peserta. ' +
+          'Hal ini untuk memastikan hasil quiz tetap valid dan menghindari kebingungan peserta.',
+      );
     }
 
     // Always regenerate token for new link (based on datetime)
@@ -777,33 +822,29 @@ export class QuizService {
         ? Math.round((correctAnswers / totalQuestions) * 100)
         : 0;
 
-    // Cari scoring template berdasarkan jumlah jawaban benar
+    // Hitung score berdasarkan jumlah jawaban benar
     let score = 0;
-    let gradeName = '';
     let gradeDescription = `${correctAnswers} Benar`;
 
     if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
-      // Mode scoring template: Cari berdasarkan JUMLAH BENAR
-      // Logika: cari template yang sesuai dengan jumlah jawaban benar
+      // Mode scoring template: Cari berdasarkan correctAnswers
       const matchingTemplate = quiz.scoringTemplates.find(
-        (template) => template.scoringName === `${correctAnswers} Benar`
+        (template) => template.correctAnswers === correctAnswers
       );
 
       if (matchingTemplate) {
-        gradeName = matchingTemplate.scoringName; // "X Benar"
-        score = matchingTemplate.minScore; // Nilai dari minScore (yang sebenarnya adalah score value)
-        gradeDescription = gradeName;
+        // Score = correctAnswers × points
+        score = correctAnswers * (matchingTemplate.points || 1);
+        gradeDescription = `${correctAnswers} Benar`;
       } else {
-        // Jika tidak ada template yang cocok, gunakan format default
-        gradeName = `${correctAnswers} Benar`;
-        score = correctAnswers; // Gunakan jumlah benar sebagai score
-        gradeDescription = gradeName;
+        // Jika tidak ada template yang cocok, gunakan default (1 point per jawaban)
+        score = correctAnswers;
+        gradeDescription = `${correctAnswers} Benar`;
       }
     } else {
-      // Mode default: gunakan jumlah benar
-      gradeName = `${correctAnswers} Benar`;
+      // Mode default: 1 point per jawaban benar
       score = correctAnswers;
-      gradeDescription = gradeName;
+      gradeDescription = `${correctAnswers} Benar`;
     }
 
     // Tentukan apakah lulus berdasarkan passing score
@@ -821,11 +862,10 @@ export class QuizService {
         benar: correctAnswers,
         salah: totalQuestions - correctAnswers,
         total: totalQuestions,
-        scoringName: gradeName, // Nama dari scoring template
         sistemPenilaian:
           quiz.scoringTemplates && quiz.scoringTemplates.length > 0
             ? 'Scoring Template'
-            : 'Jumlah Benar',
+            : 'Point System',
       },
     };
   }
