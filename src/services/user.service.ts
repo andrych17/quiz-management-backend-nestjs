@@ -248,10 +248,10 @@ export class UserService {
 
     // Get config items for display
     const serviceConfigs = await this.configItemRepository.find({
-      where: { group: 'service' },
+      where: { group: 'services' },
     });
     const locationConfigs = await this.configItemRepository.find({
-      where: { group: 'location' },
+      where: { group: 'locations' },
     });
 
     return {
@@ -312,13 +312,13 @@ export class UserService {
 
     if (user.serviceKey) {
       serviceConfig = await this.configItemRepository.findOne({
-        where: { group: 'service', key: user.serviceKey },
+        where: { group: 'services', key: user.serviceKey },
       });
     }
 
     if (user.locationKey) {
       locationConfig = await this.configItemRepository.findOne({
-        where: { group: 'location', key: user.locationKey },
+        where: { group: 'locations', key: user.locationKey },
       });
     }
 

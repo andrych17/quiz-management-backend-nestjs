@@ -12,7 +12,6 @@ import { ConfigItem } from './entities/config-item.entity';
 import { UserQuizAssignment } from './entities/user-quiz-assignment.entity';
 import { QuizImage } from './entities/quiz-image.entity';
 import { QuizScoring } from './entities/quiz-scoring.entity';
-import { UserQuizSession } from './entities/user-quiz-session.entity';
 
 // Controllers
 import { AppController } from './app.controller';
@@ -64,7 +63,6 @@ import { databaseConfig } from './config/database.config';
       UserQuizAssignment,
       QuizImage,
       QuizScoring,
-      UserQuizSession,
     ]),
     SharedServicesModule,
     AuthModule,

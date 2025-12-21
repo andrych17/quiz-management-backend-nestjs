@@ -12,7 +12,6 @@ import { ConfigItem } from '../entities/config-item.entity';
 import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
 import { QuizImage } from '../entities/quiz-image.entity';
 import { QuizScoring } from '../entities/quiz-scoring.entity';
-import { UserQuizSession } from '../entities/user-quiz-session.entity';
 
 dotenv.config();
 
@@ -36,7 +35,6 @@ async function runLocationSeed() {
       UserQuizAssignment,
       QuizImage,
       QuizScoring,
-      UserQuizSession,
     ],
   });
 

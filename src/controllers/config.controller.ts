@@ -241,7 +241,14 @@ export class ConfigController {
   async findByGroup(
     @Param('group') group: string,
   ): Promise<StdApiResponse<any>> {
-    const result = await this.configService.findByGroup(group);
+    // Support both singular and plural forms for backward compatibility
+    const groupMapping: Record<string, string> = {
+      location: 'locations',
+      service: 'services',
+    };
+
+    const normalizedGroup = groupMapping[group] || group;
+    const result = await this.configService.findByGroup(normalizedGroup);
     return ResponseFactory.success(
       result,
       `Config items for group "${group}" retrieved successfully`,
