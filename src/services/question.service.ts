@@ -293,6 +293,30 @@ export class QuestionService {
     });
   }
 
+  async findByQuizIdWithImages(quizId: number): Promise<any[]> {
+    const questions = await this.questionRepository.find({
+      where: { quizId },
+      order: { order: 'ASC' },
+    });
+
+    // Get images for all questions
+    const questionsWithImages = await Promise.all(
+      questions.map(async (question) => {
+        const images = await this.quizImageRepository.find({
+          where: { questionId: question.id, isActive: true },
+          order: { createdAt: 'ASC' },
+        });
+
+        return {
+          ...question,
+          images,
+        };
+      }),
+    );
+
+    return questionsWithImages;
+  }
+
   async getQuestionCount(quizId: number): Promise<number> {
     return this.questionRepository.count({ where: { quizId } });
   }

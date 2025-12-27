@@ -16,6 +16,8 @@ import {
 } from '../dto/attempt.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import { ConfigService } from './config.service';
+import * as ExcelJS from 'exceljs';
+import { DebugLogger } from '../lib/debug-logger';
 
 @Injectable()
 export class AttemptService {
@@ -183,7 +185,7 @@ export class AttemptService {
     // Update attempt with score and completion time using scoring templates
     const incorrectAnswers = totalQuestions - correctAnswers;
 
-    // Gunakan scoring system dari quiz (IPK mode atau percentage mode)
+    // Gunakan scoring system dari quiz (IPK mode atau standard points mode)
     let finalScore = 0;
     let grade = 'F';
     let passed = false;
@@ -200,11 +202,11 @@ export class AttemptService {
         finalScore = matchingTemplate.correctAnswerPoints; // Nilai akhir (70, 80, 90, dll)
         grade = matchingTemplate.scoringName; // Grade (A, B, C, dll)
       } else {
-        // Fallback ke persentase jika tidak ada template yang cocok
+        // Fallback ke standard scoring (0-100) jika tidak ada template yang cocok
         finalScore = Math.round((correctAnswers / totalQuestions) * 100);
       }
     } else {
-      // Mode default: gunakan persentase
+      // Mode default: gunakan standard scoring (0-100)
       finalScore = Math.round((correctAnswers / totalQuestions) * 100);
     }
 
@@ -328,37 +330,135 @@ export class AttemptService {
     return attempt.answers.sort((a, b) => a.question.order - b.question.order);
   }
 
-  async exportAttempts(quizId: number) {
-    const attempts = await this.attemptRepository.find({
-      where: { quizId },
-      relations: ['quiz', 'answers', 'answers.question'],
-      order: { createdAt: 'DESC' },
+  async exportAttemptsToExcel(
+    quizId?: number,
+    serviceKey?: string,
+    locationKey?: string,
+  ): Promise<Buffer> {
+    DebugLogger.service('AttemptService', 'exportAttemptsToExcel', {
+      quizId,
+      serviceKey,
+      locationKey,
     });
 
-    if (attempts.length === 0) {
-      return { data: [], message: 'No attempts found for this quiz' };
+    // Build query with filters
+    const queryBuilder = this.attemptRepository
+      .createQueryBuilder('attempt')
+      .leftJoinAndSelect('attempt.quiz', 'quiz');
+
+    if (quizId) {
+      queryBuilder.andWhere('attempt.quizId = :quizId', { quizId });
     }
 
-    // Format data for CSV export
-    const csvData = attempts.map((attempt) => ({
-      'Attempt ID': attempt.id,
-      'Participant Name': attempt.participantName,
-      'Participant Email': attempt.email,
-      NIJ: attempt.nij,
-      'Quiz Title': attempt.quiz.title,
-      Score: attempt.score,
-      Passed: attempt.passed ? 'Yes' : 'No',
-      'Started At': attempt.startedAt.toISOString(),
-      'Completed At': attempt.completedAt?.toISOString() || 'Not completed',
-      'Submitted At': attempt.submittedAt?.toISOString() || 'Not submitted',
-      'Total Questions': attempt.answers.length,
-      'Correct Answers': attempt.answers.filter((a) => a.answerText === a.question?.correctAnswer).length,
-    }));
+    if (serviceKey && serviceKey !== 'all_services' && !serviceKey.startsWith('all_')) {
+      queryBuilder.andWhere('quiz.serviceKey = :serviceKey', { serviceKey });
+    }
 
-    return {
-      data: csvData,
-      filename: `quiz-${quizId}-attempts-${new Date().toISOString().split('T')[0]}.csv`,
+    if (locationKey && locationKey !== 'all_locations' && !locationKey.startsWith('all_')) {
+      queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
+    }
+
+    const attempts = await queryBuilder
+      .orderBy('attempt.submittedAt', 'DESC')
+      .getMany();
+
+    if (attempts.length === 0) {
+      throw new NotFoundException('No attempts found with the specified filters');
+    }
+
+    DebugLogger.debug('AttemptService', `Exporting ${attempts.length} attempts to Excel`);
+
+    // Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Quiz Results');
+
+    // Set column headers (removed Grade)
+    worksheet.columns = [
+      { header: 'Participant Name', key: 'participantName', width: 25 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'NIJ', key: 'nij', width: 15 },
+      { header: 'Quiz Title', key: 'quizTitle', width: 30 },
+      { header: 'Score', key: 'score', width: 10 },
+      { header: 'Correct Answers', key: 'correctAnswers', width: 18 },
+      { header: 'Total Questions', key: 'totalQuestions', width: 18 },
+      { header: 'Passed', key: 'passed', width: 10 },
+      { header: 'Started At', key: 'startedAt', width: 20 },
+      { header: 'Completed At', key: 'completedAt', width: 20 },
+    ];
+
+    // Style header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4472C4' },
     };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 20;
+
+    // Add data rows
+    attempts.forEach((attempt) => {
+      const row = worksheet.addRow({
+        participantName: attempt.participantName,
+        email: attempt.email,
+        nij: attempt.nij,
+        quizTitle: attempt.quiz?.title || 'Unknown Quiz',
+        score: attempt.score,
+        correctAnswers: attempt.correctAnswers,
+        totalQuestions: attempt.totalQuestions,
+        passed: attempt.passed ? 'Yes': 'No',
+        startedAt: attempt.startedAt
+          ? new Date(attempt.startedAt).toLocaleString('id-ID')
+          : '-',
+        completedAt: attempt.completedAt
+          ? new Date(attempt.completedAt).toLocaleString('id-ID')
+          : '-',
+      });
+
+      // Conditional formatting for passed status
+      const passedCell = row.getCell('passed');
+      if (attempt.passed) {
+        passedCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFC6EFCE' }, // Light green
+        };
+        passedCell.font = { color: { argb: 'FF006100' } }; // Dark green
+      } else {
+        passedCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFC7CE' }, // Light red
+        };
+        passedCell.font = { color: { argb: 'FF9C0006' } }; // Dark red
+      }
+    });
+
+    // Add title row
+    worksheet.insertRow(1, ['Quiz Results Export', '', '', '', '', '', '', '', '', '']);
+    const titleRow = worksheet.getRow(1);
+    titleRow.font = { bold: true, size: 14 };
+    titleRow.height = 25;
+
+    // Add summary row
+    const summaryRowIndex = worksheet.rowCount + 2;
+    worksheet.getCell(`A${summaryRowIndex}`).value = 'Summary:';
+    worksheet.getCell(`B${summaryRowIndex}`).value = `Total Attempts: ${attempts.length}`;
+    worksheet.getCell(`D${summaryRowIndex}`).value = `Passed: ${attempts.filter((a) => a.passed).length}`;
+    worksheet.getCell(`F${summaryRowIndex}`).value = `Failed: ${attempts.filter((a) => !a.passed).length}`;
+
+    const summaryRow = worksheet.getRow(summaryRowIndex);
+    summaryRow.font = { bold: true };
+
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    const bufferData = Buffer.from(buffer);
+    DebugLogger.success('AttemptService', `Excel file generated successfully`, {
+      attemptCount: attempts.length,
+      bufferSize: bufferData.byteLength,
+    });
+    return bufferData;
   }
 
   async getAttemptsByEmail(email: string): Promise<Attempt[]> {
@@ -384,6 +484,7 @@ export class AttemptService {
     serviceKey?: string,
     locationKey?: string,
     quizId?: number,
+    quizName?: string,
     startDate?: string,
     endDate?: string,
   ) {
@@ -394,9 +495,16 @@ export class AttemptService {
       .createQueryBuilder('attempt')
       .leftJoinAndSelect('attempt.quiz', 'quiz');
 
-    // Filter by quiz if specified
+    // Filter by quiz ID if specified
     if (quizId) {
-      queryBuilder.where('attempt.quizId = :quizId', { quizId });
+      queryBuilder.andWhere('attempt.quizId = :quizId', { quizId });
+    }
+
+    // Filter by quiz name/title if specified
+    if (quizName) {
+      queryBuilder.andWhere('UPPER(quiz.title) LIKE UPPER(:quizName)', {
+        quizName: `%${quizName}%`,
+      });
     }
 
     // Filter by service
@@ -494,11 +602,47 @@ export class AttemptService {
       throw new NotFoundException('Attempt not found');
     }
 
+    // Fetch all questions for this quiz to ensure we show unanswered ones too
+    const questions = await this.questionRepository.find({
+      where: { quizId: attempt.quizId },
+      order: { order: 'ASC' },
+    });
+
+    // Create a map of answers for quick lookup
+    const answersMap = new Map();
+    if (attempt.answers) {
+      attempt.answers.forEach((answer) => {
+        if (answer.questionId) {
+          answersMap.set(answer.questionId, answer);
+        }
+      });
+    }
+
     // Get config mappings
     const mappings = await this.configService.getMappings();
 
-    // Sort answers by question order
-    const sortedAnswers = attempt.answers?.sort((a, b) => (a.question?.order || 0) - (b.question?.order || 0)) || [];
+    // Map all questions to answers (or placeholder if no answer)
+    const detailedAnswers = questions.map((question, index) => {
+      const answer = answersMap.get(question.id);
+      
+      // If answer exists, use it; otherwise return "unanswered" state
+      const answerText = answer ? answer.answerText : null;
+      const isCorrect = answerText === question.correctAnswer;
+      const isSkipped = answerText === null || answerText === undefined || answerText === '';
+
+      return {
+        id: answer ? answer.id : null,
+        questionId: question.id,
+        questionNumber: index + 1,
+        questionText: question.questionText,
+        questionType: question.questionType,
+        questionOptions: question.options || [],
+        answerText: isSkipped ? 'No answer provided' : answerText,
+        correctAnswer: question.correctAnswer,
+        isCorrect: isCorrect && !isSkipped,
+        isSkipped: isSkipped,
+      };
+    });
 
     return {
       id: attempt.id,
@@ -518,6 +662,8 @@ export class AttemptService {
           ? mappings.locations.mapping[attempt.quiz.locationKey] || attempt.quiz.locationKey 
           : 'No Location',
         passingScore: attempt.quiz.passingScore,
+        createdAt: attempt.quiz.createdAt,
+        completedAt: attempt.completedAt,
       },
       score: attempt.score,
       grade: attempt.grade,
@@ -525,24 +671,14 @@ export class AttemptService {
       startedAt: attempt.startedAt,
       completedAt: attempt.completedAt,
       submittedAt: attempt.submittedAt,
-      answers: sortedAnswers.map((answer, index) => ({
-        id: answer.id,
-        questionNumber: index + 1,
-        questionText: answer.question?.questionText || 'Question not found',
-        questionType: answer.question?.questionType || 'unknown',
-        questionOptions: answer.question?.options || [],
-        answerText: answer.answerText,
-        correctAnswer: answer.question?.correctAnswer || '',
-        isCorrect: answer.answerText === answer.question?.correctAnswer,
-      })),
+      answers: detailedAnswers,
       summary: {
-        totalQuestions: sortedAnswers.length,
-        correctAnswers: sortedAnswers.filter(a => a.answerText === a.question?.correctAnswer).length,
-        wrongAnswers: sortedAnswers.filter(a => a.answerText !== a.question?.correctAnswer).length,
-        scorePercentage: attempt.quiz?.questions?.length 
-          ? Math.round((sortedAnswers.filter(a => a.answerText === a.question?.correctAnswer).length / attempt.quiz.questions.length) * 100)
-          : 0,
-      },
+        totalQuestions: questions.length,
+        correctAnswers: detailedAnswers.filter(a => a.isCorrect).length,
+        wrongAnswers: detailedAnswers.filter(a => !a.isCorrect && !a.isSkipped).length,
+        skippedAnswers: detailedAnswers.filter(a => a.isSkipped).length,
+        score: attempt.score
+      }
     };
   }
 }

@@ -54,7 +54,7 @@ export class Quiz {
   serviceKey: string; // Store config key directly (e.g., 'sm', 'am', 'technical_support')
 
   @Column({ default: 70 })
-  passingScore: number; // Passing score dalam persen
+  passingScore: number; // Passing score threshold
 
   @Column({ default: 5 })
   questionsPerPage: number; // Jumlah pertanyaan per halaman

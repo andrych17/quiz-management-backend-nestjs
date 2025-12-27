@@ -23,11 +23,11 @@
     "migration:create": "npm run typeorm -- migration:create",
     "migration:run": "npm run typeorm -- migration:run -d ormconfig.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d ormconfig.ts",
-    "seed": "ts-node src/seeds/run-seeder.ts",
-    "seed:comprehensive": "ts-node src/seeds/run-comprehensive-seeder.ts",
-    "cleanup:config": "ts-node src/seeds/cleanup-config.ts"
+    "seed:main": "ts-node src/seeds/run-main-seeder.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.971.0",
+    "@aws-sdk/lib-storage": "^3.971.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -47,6 +47,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
@@ -67,7 +68,7 @@
     "@nestjs/testing": "^11.0.1",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.10.7",
+    "@types/node": "^22.19.7",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",
     "eslint": "^9.18.0",

@@ -78,8 +78,8 @@ export class PublicController {
     const actualToken = this.extractToken(token);
     const quiz = await this.quizService.findByTokenPublic(actualToken);
     
-    // Get quiz questions
-    const questions = await this.questionService.findByQuizId(quiz.id);
+    // Get quiz questions WITH images
+    const questions = await this.questionService.findByQuizIdWithImages(quiz.id);
     
     const result = {
       ...quiz,
@@ -107,7 +107,8 @@ export class PublicController {
           questionType: q.questionType,
           options: q.options,
           order: q.order,
-          isMultipleAnswer: isMultipleAnswer
+          isMultipleAnswer: isMultipleAnswer,
+          images: q.images || [] // Include images in public quiz response
           // Don't include correctAnswer for public access
         };
       })

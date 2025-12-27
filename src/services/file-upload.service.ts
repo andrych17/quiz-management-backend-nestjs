@@ -1,15 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs';
+import { R2StorageService } from './r2-storage.service';
 import * as path from 'path';
-import { promisify } from 'util';
-
-const writeFile = promisify(fs.writeFile);
-const mkdir = promisify(fs.mkdir);
 
 @Injectable()
 export class FileUploadService {
-  private readonly uploadPath: string;
   private readonly maxFileSize: number = 5 * 1024 * 1024; // 5MB in bytes
   private readonly allowedMimeTypes = [
     'image/jpeg',
@@ -19,25 +14,10 @@ export class FileUploadService {
     'image/webp',
   ];
 
-  constructor(private readonly configService: ConfigService) {
-    // Get upload path from environment or use default
-    this.uploadPath =
-      this.configService.get<string>('FILE_STORAGE_PATH') ||
-      path.join(process.cwd(), 'uploads', 'quiz-images');
-
-    // Ensure upload directory exists
-    this.ensureUploadDirectory();
-  }
-
-  private async ensureUploadDirectory(): Promise<void> {
-    try {
-      if (!fs.existsSync(this.uploadPath)) {
-        await mkdir(this.uploadPath, { recursive: true });
-      }
-    } catch (error) {
-      console.error('Failed to create upload directory:', error);
-    }
-  }
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly r2StorageService: R2StorageService,
+  ) {}
 
   /**
    * Validate image file
@@ -72,19 +52,7 @@ export class FileUploadService {
   }
 
   /**
-   * Generate unique filename
-   */
-  generateFileName(originalName: string, prefix: string = 'img'): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    const ext = path.extname(originalName).toLowerCase();
-    const sanitizedPrefix = prefix.replace(/[^a-z0-9]/gi, '_');
-
-    return `${sanitizedPrefix}_${timestamp}_${random}${ext}`;
-  }
-
-  /**
-   * Save image file to storage
+   * Save image file to R2 cloud storage
    */
   async saveImage(
     fileBuffer: Buffer,
@@ -101,38 +69,42 @@ export class FileUploadService {
     // Validate image
     this.validateImage(fileBuffer, mimeType, originalName);
 
-    // Generate unique filename
-    const fileName = this.generateFileName(originalName, prefix);
-    const filePath = path.join(this.uploadPath, fileName);
-    const relativePath = path.join('uploads', 'quiz-images', fileName);
-
     try {
-      // Save file to disk
-      await writeFile(filePath, fileBuffer);
+      // Upload to R2 storage
+      const uploadResult = await this.r2StorageService.uploadFile(
+        fileBuffer,
+        originalName,
+        mimeType,
+        prefix,
+      );
 
       return {
-        fileName,
-        filePath: relativePath.replace(/\\/g, '/'), // Normalize path separators
-        fileSize: fileBuffer.length,
+        fileName: uploadResult.objectKey, // R2 object key
+        filePath: uploadResult.backendUrl, // Backend API URL (not direct R2 URL)
+        fileSize: uploadResult.fileSize,
         mimeType,
         originalName,
       };
     } catch (error) {
-      throw new BadRequestException(`Gagal menyimpan file: ${error.message}`);
+      throw new BadRequestException(`Gagal menyimpan file ke cloud storage: ${error.message}`);
     }
   }
 
   /**
-   * Delete image file from storage
+   * Delete image file from R2 cloud storage
    */
   async deleteImage(filePath: string): Promise<void> {
     try {
-      const fullPath = path.join(process.cwd(), filePath);
-      if (fs.existsSync(fullPath)) {
-        await promisify(fs.unlink)(fullPath);
+      // Extract object key from URL
+      const objectKey = this.r2StorageService.extractObjectKey(filePath);
+      
+      if (objectKey) {
+        await this.r2StorageService.deleteFile(objectKey);
+      } else {
+        console.warn(`Could not extract object key from URL: ${filePath}`);
       }
     } catch (error) {
-      console.error('Failed to delete file:', error);
+      console.error('Failed to delete file from R2:', error);
       // Don't throw error, just log it
     }
   }
@@ -163,7 +135,7 @@ export class FileUploadService {
   }
 
   /**
-   * Upload image from base64 string
+   * Upload image from base64 string to R2
    */
   async uploadFromBase64(
     base64String: string,
@@ -182,11 +154,15 @@ export class FileUploadService {
 
   /**
    * Get full URL for file access
+   * Returns backend API URL that serves files from private R2 bucket
    */
   getFileUrl(filePath: string): string {
-    const fileServerUrl =
-      this.configService.get<string>('FILE_SERVER_URL') ||
-      this.configService.get<string>('BACKEND_URL');
-    return `${fileServerUrl}/${filePath}`;
+    // Backend URL is already a complete URL
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      return filePath;
+    }
+    
+    // Fallback: use R2 service to generate backend URL from object key
+    return this.r2StorageService.getBackendUrl(filePath);
   }
 }

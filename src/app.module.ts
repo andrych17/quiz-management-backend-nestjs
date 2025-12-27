@@ -22,6 +22,8 @@ import { AttemptController } from './controllers/attempt.controller';
 import { ConfigController } from './controllers/config.controller';
 import { UserQuizAssignmentController } from './controllers/user-quiz-assignment.controller';
 import { PublicController } from './controllers/public.controller';
+import { FileController } from './controllers/file.controller';
+import { DashboardController } from './controllers/dashboard.controller';
 
 // Services
 import { AppService } from './app.service';
@@ -32,6 +34,8 @@ import { UrlShortenerService } from './services/url-shortener.service';
 import { UserQuizAssignmentService } from './services/user-quiz-assignment.service';
 import { UrlGeneratorService } from './services/url-generator.service';
 import { FileUploadService } from './services/file-upload.service';
+import { R2StorageService } from './services/r2-storage.service';
+import { DashboardService } from './services/dashboard.service';
 
 // Shared Services Module
 import { SharedServicesModule } from './shared/shared-services.module';
@@ -76,6 +80,8 @@ import { databaseConfig } from './config/database.config';
     ConfigController,
     UserQuizAssignmentController,
     PublicController,
+    FileController,
+    DashboardController,
   ],
   providers: [
     AppService,
@@ -85,7 +91,9 @@ import { databaseConfig } from './config/database.config';
     UrlShortenerService,
     UserQuizAssignmentService,
     UrlGeneratorService,
+    R2StorageService,
     FileUploadService,
+    DashboardService,
   ],
 })
 export class AppModule {}

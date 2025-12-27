@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   HttpStatus,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,15 +17,17 @@ import {
   ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { AttemptService } from '../services/attempt.service';
 import { AttemptResponseDto } from '../dto/attempt.dto';
+import { DebugLogger } from '../lib/debug-logger';
 
 @ApiTags('attempts')
 @Controller('api/attempts')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@Roles('superadmin', 'admin')
 @ApiBearerAuth()
 export class AttemptController {
   constructor(private readonly attemptService: AttemptService) {}
@@ -33,10 +36,11 @@ export class AttemptController {
   @ApiOperation({ summary: 'Get all attempts with pagination and filters (Admin only)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by participant name, email, or NIJ' })
   @ApiQuery({ name: 'serviceKey', required: false, type: String })
   @ApiQuery({ name: 'locationKey', required: false, type: String })
   @ApiQuery({ name: 'quizId', required: false, type: Number })
+  @ApiQuery({ name: 'quizName', required: false, type: String, description: 'Filter by quiz title/name' })
   @ApiQuery({ name: 'startDate', required: false, type: String })
   @ApiQuery({ name: 'endDate', required: false, type: String })
   @ApiResponse({
@@ -46,14 +50,26 @@ export class AttemptController {
   })
   async findAll(
     @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('limit') limit: number = 25,
     @Query('search') search?: string,
     @Query('serviceKey') serviceKey?: string,
     @Query('locationKey') locationKey?: string,
     @Query('quizId') quizId?: number,
+    @Query('quizName') quizName?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
+    DebugLogger.endpoint('GET', '/api/attempts', {}, {
+      page,
+      limit,
+      search,
+      serviceKey,
+      locationKey,
+      quizId,
+      quizName,
+      startDate,
+      endDate,
+    });
     return this.attemptService.findAllWithFilter(
       page,
       limit,
@@ -61,6 +77,7 @@ export class AttemptController {
       serviceKey,
       locationKey,
       quizId,
+      quizName,
       startDate,
       endDate,
     );
@@ -90,14 +107,45 @@ export class AttemptController {
     return this.attemptService.remove(id);
   }
 
-  @Get('quiz/:quizId/export')
-  @ApiOperation({ summary: 'Export quiz attempts to CSV (Admin only)' })
-  @ApiParam({ name: 'quizId', type: Number })
+  @Get('export-excel')
+  @ApiOperation({ summary: 'Export quiz attempts to Excel (Admin only)' })
+  @ApiQuery({ name: 'quizId', required: false, type: Number, description: 'Filter by quiz ID' })
+  @ApiQuery({ name: 'serviceKey', required: false, type: String, description: 'Filter by service' })
+  @ApiQuery({ name: 'locationKey', required: false, type: String, description: 'Filter by location' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Quiz attempts exported successfully',
+    description: 'Quiz attempts exported to Excel successfully',
   })
-  async exportAttempts(@Param('quizId', ParseIntPipe) quizId: number) {
-    return this.attemptService.exportAttempts(quizId);
+  async exportAttemptsToExcel(
+    @Query('quizId', new ParseIntPipe({ optional: true })) quizId?: number,
+    @Query('serviceKey') serviceKey?: string,
+    @Query('locationKey') locationKey?: string,
+    @Res() res?: Response,
+  ) {
+    DebugLogger.endpoint('GET', '/api/attempts/export-excel', {}, {
+      quizId,
+      serviceKey,
+      locationKey,
+    });
+
+    const buffer = await this.attemptService.exportAttemptsToExcel(
+      quizId,
+      serviceKey,
+      locationKey,
+    );
+
+    const filename = `quiz-attempts-${new Date().toISOString().split('T')[0]}.xlsx`;
+    DebugLogger.debug('AttemptController', `Sending Excel file: ${filename}`, {
+      bufferSize: buffer.byteLength,
+    });
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.byteLength,
+    });
+
+    res.send(buffer);
   }
 }

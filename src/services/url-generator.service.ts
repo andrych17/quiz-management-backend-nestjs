@@ -5,11 +5,13 @@ import { ConfigService } from '@nestjs/config';
 export class UrlGeneratorService {
   private readonly frontendUrl: string;
   private readonly tinyUrlApiToken: string;
+  private readonly enableTinyUrl: boolean;
 
   constructor(private configService: ConfigService) {
     this.frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     this.tinyUrlApiToken = this.configService.get<string>('TINYURL_API_TOKEN');
+    this.enableTinyUrl = this.configService.get<boolean>('ENABLE_TINYURL') !== false;
   }
 
   /**
@@ -21,15 +23,19 @@ export class UrlGeneratorService {
   }
 
   /**
-   * Generate short URL using TinyURL API (temporarily disabled)
+   * Generate short URL using TinyURL API
    */
-  async generateShortUrl(normalUrl: string, alias?: string): Promise<string> {
-    // Temporarily disable TinyURL - return normal URL
-    return normalUrl;
+  async generateShortUrl(normalUrl: string, alias?: string): Promise<string | null> {
+    // Check if TinyURL is enabled
+    if (!this.enableTinyUrl) {
+      console.log('TinyURL is disabled in configuration');
+      return null;
+    }
     
     if (!this.tinyUrlApiToken) {
-      // Fallback to normal URL if TinyURL token not configured
-      return normalUrl;
+      // Return null if TinyURL token not configured
+      console.warn('TinyURL API token not configured - skipping short URL generation');
+      return null;
     }
 
     try {
@@ -52,12 +58,14 @@ export class UrlGeneratorService {
       if (result.data && result.data.tiny_url) {
         return result.data.tiny_url;
       } else {
-        console.warn('TinyURL API error:', result);
-        return normalUrl;
+        // TinyURL API returned error (could be limit reached, invalid alias, etc.)
+        console.warn('TinyURL API error:', result.errors || result);
+        return null; // Return null instead of normalUrl
       }
     } catch (error) {
-      console.error('Error generating short URL:', error);
-      return normalUrl; // Fallback to normal URL
+      // Network error or other exception
+      console.error('Error generating short URL:', error.message || error);
+      return null; // Return null instead of normalUrl
     }
   }
 
@@ -75,11 +83,11 @@ export class UrlGeneratorService {
   }> {
     const normalUrl = this.generateNormalUrl(quizSlug, quizToken);
     const generatedAlias = alias || this.generateUrlAlias(quizId, quizToken);
-    const shortUrl = await this.generateShortUrl(normalUrl, generatedAlias);
+    const shortUrlResult = await this.generateShortUrl(normalUrl, generatedAlias);
 
     return {
       normalUrl,
-      shortUrl,
+      shortUrl: shortUrlResult || '', // Empty string if TinyURL fails
     };
   }
 
