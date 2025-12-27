@@ -158,10 +158,22 @@ export class UserResponseDto {
   serviceKey?: string;
 
   @ApiPropertyOptional({
+    example: 'Service Management',
+    description: 'Service display name',
+  })
+  serviceName?: string;
+
+  @ApiPropertyOptional({
     example: 'jakarta_pusat',
     description: 'Location key',
   })
   locationKey?: string;
+
+  @ApiPropertyOptional({
+    example: 'Jakarta Pusat',
+    description: 'Location display name',
+  })
+  locationName?: string;
 
   @ApiPropertyOptional({
     example: { id: 1, key: 'sm', value: 'Service Management' },
@@ -208,10 +220,22 @@ export class UserDetailResponseDto {
   serviceKey?: string;
 
   @ApiPropertyOptional({
+    example: 'Service Management',
+    description: 'Service display name',
+  })
+  serviceName?: string;
+
+  @ApiPropertyOptional({
     example: 'jakarta_pusat',
     description: 'Location key',
   })
   locationKey?: string;
+
+  @ApiPropertyOptional({
+    example: 'Jakarta Pusat',
+    description: 'Location display name',
+  })
+  locationName?: string;
 
   @ApiPropertyOptional({
     example: { id: 1, key: 'sm', value: 'Service Management' },

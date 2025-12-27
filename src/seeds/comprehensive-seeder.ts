@@ -1,16 +1,10 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import {
-  User,
-  Quiz,
-  Question,
-  ConfigItem,
-  UserQuizAssignment,
-} from '../entities';
-
+import { User, ConfigItem, Quiz, Question, QuizScoring } from '../entities';
+import { QuizType } from '../entities/quiz.entity';
 
 export class ComprehensiveSeeder {
-  constructor(private dataSource: DataSource) {}
+  constructor(private dataSource: DataSource) { }
 
   async run(): Promise<void> {
     console.log('🌱 Starting comprehensive database seeding...');
@@ -18,7 +12,6 @@ export class ComprehensiveSeeder {
     await this.seedConfigItems();
     await this.seedUsers();
     await this.seedQuizzes();
-    await this.seedUserQuizAssignments();
 
     console.log('✅ Comprehensive database seeding completed!');
   }
@@ -26,171 +19,106 @@ export class ComprehensiveSeeder {
   private async seedConfigItems(): Promise<void> {
     const configRepository = this.dataSource.getRepository(ConfigItem);
 
-    // Check if config items already exist
-    const existingConfigs = await configRepository.count();
-    if (existingConfigs > 0) {
-      console.log(
-        `✓ Config items already exist (${existingConfigs} items), skipping seeding`,
-      );
-      return;
-    }
-
     const configs = [
-      // App configs
+      // ==================== LOCATIONS ====================
       {
-        group: 'app',
-        key: 'name',
-        value: 'Logic Test GMS Church',
-        description: 'Application name',
-        order: 1,
-        isActive: true,
-        createdBy: 'system',
-      },
-      {
-        group: 'app',
-        key: 'version',
-        value: '1.0.0',
-        description: 'Application version',
-        order: 2,
-        isActive: true,
-        createdBy: 'system',
-      },
-
-      // Service configs
-      {
-        group: 'service',
-        key: 'all_services',
-        value: 'All Services',
-        description: 'Access to all services (superadmin)',
-        order: 0,
-        isActive: true,
-        createdBy: 'system',
-      },
-      {
-        group: 'service',
-        key: 'service_management',
-        value: 'Service Management (SM)',
-        description: 'Service Management division',
-        order: 1,
-        isActive: true,
-        createdBy: 'system',
-      },
-      {
-        group: 'service',
-        key: 'asset_management',
-        value: 'Asset Management (AM)',
-        description: 'Asset Management division',
-        order: 2,
-        isActive: true,
-        createdBy: 'system',
-      },
-      {
-        group: 'service',
-        key: 'technical_support',
-        value: 'Technical Support',
-        description: 'Technical Support division',
-        order: 3,
-        isActive: true,
-        createdBy: 'system',
-      },
-      {
-        group: 'service',
-        key: 'network_admin',
-        value: 'Network Administrator',
-        description: 'Network Administration division',
-        order: 4,
-        isActive: true,
-        createdBy: 'system',
-      },
-      {
-        group: 'service',
-        key: 'database_admin',
-        value: 'Database Administrator',
-        description: 'Database Administration division',
-        order: 5,
-        isActive: true,
-        createdBy: 'system',
-      },
-
-      // Location configs
-      {
-        group: 'location',
+        group: 'locations',
         key: 'all_locations',
         value: 'All Locations',
-        description: 'Access to all locations (superadmin)',
+        description: 'Access to all locations (for superadmin)',
         order: 0,
         isActive: true,
         createdBy: 'system',
       },
       {
-        group: 'location',
-        key: 'jakarta_pusat',
-        value: 'Jakarta Pusat',
-        description: 'Jakarta Central location',
+        group: 'locations',
+        key: 'jakarta',
+        value: 'Jakarta',
+        description: 'DKI Jakarta',
         order: 1,
         isActive: true,
         createdBy: 'system',
       },
       {
-        group: 'location',
-        key: 'jakarta_utara',
-        value: 'Jakarta Utara',
-        description: 'Jakarta North location',
+        group: 'locations',
+        key: 'surabaya',
+        value: 'Surabaya',
+        description: 'Jawa Timur - Surabaya',
         order: 2,
         isActive: true,
         createdBy: 'system',
       },
       {
-        group: 'location',
-        key: 'jakarta_selatan',
-        value: 'Jakarta Selatan',
-        description: 'Jakarta South location',
+        group: 'locations',
+        key: 'bandung',
+        value: 'Bandung',
+        description: 'Jawa Barat - Bandung',
         order: 3,
         isActive: true,
         createdBy: 'system',
       },
       {
-        group: 'location',
-        key: 'jakarta_barat',
-        value: 'Jakarta Barat',
-        description: 'Jakarta West location',
+        group: 'locations',
+        key: 'medan',
+        value: 'Medan',
+        description: 'Sumatera Utara - Medan',
         order: 4,
         isActive: true,
         createdBy: 'system',
       },
       {
-        group: 'location',
-        key: 'jakarta_timur',
-        value: 'Jakarta Timur',
-        description: 'Jakarta East location',
+        group: 'locations',
+        key: 'semarang',
+        value: 'Semarang',
+        description: 'Jawa Tengah - Semarang',
         order: 5,
         isActive: true,
         createdBy: 'system',
       },
       {
-        group: 'location',
-        key: 'tangerang',
-        value: 'Tangerang',
-        description: 'Tangerang location',
+        group: 'locations',
+        key: 'makassar',
+        value: 'Makassar',
+        description: 'Sulawesi Selatan - Makassar',
         order: 6,
         isActive: true,
         createdBy: 'system',
       },
       {
-        group: 'location',
-        key: 'bekasi',
-        value: 'Bekasi',
-        description: 'Bekasi location',
+        group: 'locations',
+        key: 'denpasar',
+        value: 'Denpasar',
+        description: 'Bali - Denpasar',
         order: 7,
         isActive: true,
         createdBy: 'system',
       },
+
+      // ==================== SERVICES ====================
       {
-        group: 'location',
-        key: 'depok',
-        value: 'Depok',
-        description: 'Depok location',
-        order: 8,
+        group: 'services',
+        key: 'all_services',
+        value: 'All Services',
+        description: 'Access to all services (for superadmin)',
+        order: 0,
+        isActive: true,
+        createdBy: 'system',
+      },
+      {
+        group: 'services',
+        key: 'sm',
+        value: 'Service Ministry',
+        description: 'Service Ministry - pelayanan jemaat',
+        order: 1,
+        isActive: true,
+        createdBy: 'system',
+      },
+      {
+        group: 'services',
+        key: 'am',
+        value: 'Art Ministry',
+        description: 'Art Ministry - pelayanan seni dan musik',
+        order: 2,
         isActive: true,
         createdBy: 'system',
       },
@@ -202,25 +130,13 @@ export class ComprehensiveSeeder {
 
   private async seedUsers(): Promise<void> {
     const userRepository = this.dataSource.getRepository(User);
-    const configRepository = this.dataSource.getRepository(ConfigItem);
-
-    // Check if users already exist
-    const existingUsers = await userRepository.count();
-    if (existingUsers > 0) {
-      console.log(
-        `✓ Users already exist (${existingUsers} users), skipping seeding`,
-      );
-      return;
-    }
-
-    // No need to fetch config items anymore, we'll use keys directly
 
     // Hash passwords
     const saltRounds = 10;
     const defaultPassword = await bcrypt.hash('password123', saltRounds);
 
     const users = [
-      // Superadmin
+      // ==================== SUPERADMIN ====================
       {
         email: 'superadmin@gms.com',
         name: 'Super Administrator',
@@ -233,133 +149,153 @@ export class ComprehensiveSeeder {
         updatedBy: 'system',
       },
 
-      // Service Management Admins
+      // ==================== SERVICE MANAGEMENT ====================
       {
-        email: 'admin.sm@gms.com',
-        name: 'Admin Service Management',
+        email: 'admin.sm.jakarta@gms.com',
+        name: 'Admin SM Jakarta',
         password: defaultPassword,
         role: 'admin' as const,
         serviceKey: 'sm',
-        locationKey: 'jakarta_pusat',
+        locationKey: 'jakarta',
         isActive: true,
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
       {
-        email: 'bambang.sm@gms.com',
-        name: 'Bambang Sutrisno (SM)',
+        email: 'admin.sm.surabaya@gms.com',
+        name: 'Admin SM Surabaya',
         password: defaultPassword,
         role: 'admin' as const,
         serviceKey: 'sm',
-        locationKey: 'jakarta_utara',
+        locationKey: 'surabaya',
         isActive: true,
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
       {
-        email: 'sari.sm@gms.com',
-        name: 'Sari Dewi Kusuma (SM)',
+        email: 'admin.sm.bandung@gms.com',
+        name: 'Admin SM Bandung',
         password: defaultPassword,
         role: 'admin' as const,
         serviceKey: 'sm',
-        locationKey: 'jakarta_selatan',
+        locationKey: 'bandung',
         isActive: true,
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
 
-      // Asset Management Admins
+      // ==================== ASSET MANAGEMENT ====================
       {
-        email: 'admin.am@gms.com',
-        name: 'Admin Asset Management',
+        email: 'admin.am.jakarta@gms.com',
+        name: 'Admin AM Jakarta',
         password: defaultPassword,
         role: 'admin' as const,
         serviceKey: 'am',
-        locationKey: 'jakarta_pusat',
+        locationKey: 'jakarta',
         isActive: true,
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
       {
-        email: 'andi.am@gms.com',
-        name: 'Andi Prasetyo (AM)',
+        email: 'admin.am.surabaya@gms.com',
+        name: 'Admin AM Surabaya',
         password: defaultPassword,
         role: 'admin' as const,
         serviceKey: 'am',
-        locationKey: 'jakarta_utara',
+        locationKey: 'surabaya',
         isActive: true,
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
       {
-        email: 'lisa.am@gms.com',
-        name: 'Lisa Handayani (AM)',
+        email: 'admin.am.medan@gms.com',
+        name: 'Admin AM Medan',
         password: defaultPassword,
         role: 'admin' as const,
         serviceKey: 'am',
-        locationKey: 'jakarta_selatan',
+        locationKey: 'medan',
         isActive: true,
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
 
-      // Technical Support Admins
+      // ==================== REGULAR USERS ====================
       {
-        email: 'admin.tech@gms.com',
-        name: 'Admin Technical Support',
+        email: 'user.jakarta@gms.com',
+        name: 'Ahmad Rizki (Jakarta)',
         password: defaultPassword,
-        role: 'admin' as const,
-        serviceKey: 'technical_support',
-        locationKey: 'jakarta_pusat',
+        role: 'user' as const,
+        serviceKey: null,
+        locationKey: 'jakarta',
+        isActive: true,
+        createdBy: 'admin.sm.jakarta@gms.com',
+        updatedBy: 'admin.sm.jakarta@gms.com',
+      },
+      {
+        email: 'user.surabaya@gms.com',
+        name: 'Dewi Lestari (Surabaya)',
+        password: defaultPassword,
+        role: 'user' as const,
+        serviceKey: null,
+        locationKey: 'surabaya',
+        isActive: true,
+        createdBy: 'admin.am.surabaya@gms.com',
+        updatedBy: 'admin.am.surabaya@gms.com',
+      },
+      {
+        email: 'user.bandung@gms.com',
+        name: 'Rudi Hermawan (Bandung)',
+        password: defaultPassword,
+        role: 'user' as const,
+        serviceKey: null,
+        locationKey: 'bandung',
+        isActive: true,
+        createdBy: 'admin.sm.bandung@gms.com',
+        updatedBy: 'admin.sm.bandung@gms.com',
+      },
+      {
+        email: 'user.medan@gms.com',
+        name: 'Siti Nurhaliza (Medan)',
+        password: defaultPassword,
+        role: 'user' as const,
+        serviceKey: null,
+        locationKey: 'medan',
+        isActive: true,
+        createdBy: 'admin.am.medan@gms.com',
+        updatedBy: 'admin.am.medan@gms.com',
+      },
+      {
+        email: 'user.semarang@gms.com',
+        name: 'Budi Santoso (Semarang)',
+        password: defaultPassword,
+        role: 'user' as const,
+        serviceKey: null,
+        locationKey: 'semarang',
         isActive: true,
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
       {
-        email: 'budi.tech@gms.com',
-        name: 'Budi Santoso (Tech)',
+        email: 'user.makassar@gms.com',
+        name: 'Andi Mappanyukki (Makassar)',
         password: defaultPassword,
-        role: 'admin' as const,
-        serviceKey: 'technical_support',
-        locationKey: 'jakarta_utara',
+        role: 'user' as const,
+        serviceKey: null,
+        locationKey: 'makassar',
         isActive: true,
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
-
-      // Regular Users
       {
-        email: 'user1@gms.com',
-        name: 'Ahmad Rizki Pratama',
+        email: 'user.denpasar@gms.com',
+        name: 'Ketut Widia (Denpasar)',
         password: defaultPassword,
         role: 'user' as const,
         serviceKey: null,
-        locationKey: 'jakarta_pusat',
+        locationKey: 'denpasar',
         isActive: true,
-        createdBy: 'admin.sm@gms.com',
-        updatedBy: 'admin.sm@gms.com',
-      },
-      {
-        email: 'user2@gms.com',
-        name: 'Dewi Lestari',
-        password: defaultPassword,
-        role: 'user' as const,
-        serviceKey: null,
-        locationKey: 'jakarta_utara',
-        isActive: true,
-        createdBy: 'admin.am@gms.com',
-        updatedBy: 'admin.am@gms.com',
-      },
-      {
-        email: 'user3@gms.com',
-        name: 'Rudi Hermawan',
-        password: defaultPassword,
-        role: 'user' as const,
-        serviceKey: null,
-        locationKey: 'jakarta_selatan',
-        isActive: true,
-        createdBy: 'admin.tech@gms.com',
-        updatedBy: 'admin.tech@gms.com',
+        createdBy: 'superadmin@gms.com',
+        updatedBy: 'superadmin@gms.com',
       },
     ];
 
@@ -370,306 +306,102 @@ export class ComprehensiveSeeder {
   private async seedQuizzes(): Promise<void> {
     const quizRepository = this.dataSource.getRepository(Quiz);
     const questionRepository = this.dataSource.getRepository(Question);
+    const scoringRepository = this.dataSource.getRepository(QuizScoring);
 
-    // Check if quizzes already exist
-    const existingQuizzes = await quizRepository.count();
-    if (existingQuizzes > 0) {
-      console.log(
-        `✓ Quizzes already exist (${existingQuizzes} quizzes), skipping seeding`,
-      );
-      return;
-    }
-
-    // Quiz 1: Service Management - Jakarta Pusat
-    const smQuiz = quizRepository.create({
-      title: 'Test Masuk Service Management Jakarta Pusat',
-      description:
-        'Test untuk seleksi masuk tim Service Management di Jakarta Pusat. Test ini mencakup pemahaman ITIL, service desk, dan manajemen layanan IT.',
-      slug: 'test-sm-jakarta-pusat',
-      token: 'sm-jkt-pusat-2024',
-
+    // Create a sample quiz
+    const quiz = await quizRepository.save({
+      title: 'General Knowledge Quiz - Service Management',
+      description: 'Test your knowledge about basic service management concepts and procedures',
+      slug: 'general-knowledge-sm',
+      token: 'GK-SM-' + Date.now(),
+      serviceType: 'service_management',
+      quizType: QuizType.SCHEDULED,
+      locationKey: 'jakarta',
       serviceKey: 'sm',
-      locationKey: 'jakarta_pusat',
-      isPublished: true,
-      isActive: true,
-      startDateTime: new Date('2024-12-01T08:00:00Z'),
-      endDateTime: new Date('2025-01-31T23:59:59Z'),
       passingScore: 70,
       questionsPerPage: 5,
-      durationMinutes: 60,
-      createdBy: 'admin.sm@gms.com',
-    });
-
-    // Quiz 2: Asset Management - Jakarta Utara
-    const amQuiz = quizRepository.create({
-      title: 'Test Asset Management Jakarta Utara',
-      description:
-        'Test untuk seleksi masuk tim Asset Management di Jakarta Utara. Test ini mencakup pemahaman manajemen aset IT, inventarisasi, dan maintenance.',
-      slug: 'test-am-jakarta-utara',
-      token: 'am-jkt-utara-2024',
-
-
-      serviceKey: 'am',
-      locationKey: 'jakarta_utara',
+      durationMinutes: 30,
+      isActive: true,
       isPublished: true,
-      isActive: true,
-      startDateTime: new Date('2024-12-15T08:00:00Z'),
-      endDateTime: new Date('2025-02-15T23:59:59Z'),
-      passingScore: 75,
-      questionsPerPage: 4,
-      durationMinutes: 90,
-      createdBy: 'admin.am@gms.com',
+      startDateTime: new Date('2025-01-01T08:00:00'),
+      endDateTime: new Date('2025-12-31T17:00:00'),
+      createdBy: 'superadmin@gms.com',
+      updatedBy: 'superadmin@gms.com',
     });
 
-    // Quiz 3: Technical Support - Jakarta Selatan
-    const techQuiz = quizRepository.create({
-      title: 'Test Technical Support Jakarta Selatan',
-      description:
-        'Test untuk seleksi masuk tim Technical Support di Jakarta Selatan. Test ini mencakup troubleshooting, customer service, dan technical knowledge.',
-      slug: 'test-tech-jakarta-selatan',
-      token: 'tech-jkt-selatan-2024',
-
-
-      serviceKey: 'technical_support',
-      locationKey: 'jakarta_selatan',
-      isPublished: false,
-      isActive: true,
-      startDateTime: null,
-      endDateTime: null,
-      passingScore: 65,
-      questionsPerPage: 3,
-      durationMinutes: 45,
-      createdBy: 'admin.tech@gms.com',
-    });
-
-    const savedSmQuiz = await quizRepository.save(smQuiz);
-    const savedAmQuiz = await quizRepository.save(amQuiz);
-    const savedTechQuiz = await quizRepository.save(techQuiz);
-
-    // Questions for SM Quiz
-    const smQuestions = [
+    // Create questions for the quiz
+    const questions = [
       {
+        quizId: quiz.id,
+        questionText: 'What does SLA stand for in service management?',
+        questionType: 'multiple-choice' as const,
+        options: [
+          'Service Level Agreement',
+          'System Level Analysis',
+          'Standard Level Assessment',
+          'Service Line Authorization',
+        ],
+        correctAnswer: 'Service Level Agreement',
         order: 1,
-        questionText:
-          'Apa yang dimaksud dengan Service Management dalam konteks IT?',
-        questionType: 'multiple-choice' as const,
-        options: [
-          'Pengelolaan perangkat keras komputer',
-          'Pendekatan untuk mengelola layanan IT agar memberikan nilai kepada pelanggan',
-          'Software untuk monitoring jaringan',
-          'Sistem keamanan IT',
-        ],
-        correctAnswer:
-          'Pendekatan untuk mengelola layanan IT agar memberikan nilai kepada pelanggan',
-        points: 10,
-        isRequired: true,
-        quizId: savedSmQuiz.id,
-        createdBy: 'admin.sm@gms.com',
       },
       {
+        quizId: quiz.id,
+        questionText: 'Is ITIL a framework for IT service management?',
+        questionType: 'true-false' as const,
+        options: ['True', 'False'],
+        correctAnswer: 'True',
         order: 2,
-        questionText:
-          'ITIL adalah framework yang digunakan dalam Service Management. Apa kepanjangan dari ITIL?',
-        questionType: 'multiple-choice' as const,
-        options: [
-          'Information Technology Infrastructure Library',
-          'Internet Technology Integration Logic',
-          'IT Implementation and Learning',
-          'Information Technical Integration Library',
-        ],
-        correctAnswer: 'Information Technology Infrastructure Library',
-        points: 10,
-        isRequired: true,
-        quizId: savedSmQuiz.id,
-        createdBy: 'admin.sm@gms.com',
       },
       {
-        order: 3,
-        questionText: 'Pilih semua yang termasuk dalam ITIL Service Lifecycle:',
+        quizId: quiz.id,
+        questionText: 'Which of the following are key components of incident management? (Select all that apply)',
         questionType: 'multiple-select' as const,
         options: [
-          'Service Strategy',
-          'Service Design',
-          'Service Transition',
-          'Service Operation',
-          'Continual Service Improvement',
-          'Service Development',
+          'Incident logging',
+          'Incident categorization',
+          'Incident prioritization',
+          'Incident celebration',
         ],
-        correctAnswer:
-          'Service Strategy,Service Design,Service Transition,Service Operation,Continual Service Improvement',
-        points: 15,
-        isRequired: true,
-        quizId: savedSmQuiz.id,
-        createdBy: 'admin.sm@gms.com',
+        correctAnswer: 'Incident logging,Incident categorization,Incident prioritization',
+        order: 3,
       },
       {
+        quizId: quiz.id,
+        questionText: 'What is the main goal of change management?',
+        questionType: 'multiple-choice' as const,
+        options: [
+          'To prevent all changes',
+          'To manage changes with minimal disruption',
+          'To delay all changes',
+          'To automate all processes',
+        ],
+        correctAnswer: 'To manage changes with minimal disruption',
         order: 4,
-        questionText:
-          'Jelaskan secara singkat apa itu Incident Management dalam ITIL.',
-        questionType: 'text' as const,
-        options: null,
-        correctAnswer:
-          'Proses untuk mengembalikan layanan IT normal secepat mungkin setelah terjadi gangguan dan meminimalkan dampak negatif terhadap operasi bisnis',
-        points: 15,
-        isRequired: true,
-        quizId: savedSmQuiz.id,
-        createdBy: 'admin.sm@gms.com',
+      },
+      {
+        quizId: quiz.id,
+        questionText: 'The primary purpose of a service desk is to provide a single point of contact between service provider and users.',
+        questionType: 'true-false' as const,
+        options: ['True', 'False'],
+        correctAnswer: 'True',
+        order: 5,
       },
     ];
 
-    // Questions for AM Quiz
-    const amQuestions = [
-      {
-        order: 1,
-        questionText: 'Apa tujuan utama dari Asset Management?',
-        questionType: 'multiple-choice' as const,
-        options: [
-          'Mengurangi jumlah aset perusahaan',
-          'Memaksimalkan nilai dan meminimalkan risiko aset',
-          'Menjual aset secepat mungkin',
-          'Menyimpan aset di gudang',
-        ],
-        correctAnswer: 'Memaksimalkan nilai dan meminimalkan risiko aset',
-        points: 10,
-        isRequired: true,
-        quizId: savedAmQuiz.id,
-        createdBy: 'admin.am@gms.com',
-      },
-      {
-        order: 2,
-        questionText: 'Pilih semua yang termasuk dalam lifecycle aset IT:',
-        questionType: 'multiple-select' as const,
-        options: [
-          'Planning',
-          'Procurement',
-          'Deployment',
-          'Maintenance',
-          'Disposal',
-          'Marketing',
-        ],
-        correctAnswer: 'Planning,Procurement,Deployment,Maintenance,Disposal',
-        points: 15,
-        isRequired: true,
-        quizId: savedAmQuiz.id,
-        createdBy: 'admin.am@gms.com',
-      },
-      {
-        order: 3,
-        questionText: 'Apa itu Configuration Management Database (CMDB)?',
-        questionType: 'text' as const,
-        options: null,
-        correctAnswer:
-          'Database yang berisi informasi tentang semua Configuration Items (CI) dan hubungan antar CI dalam infrastruktur IT',
-        points: 15,
-        isRequired: true,
-        quizId: savedAmQuiz.id,
-        createdBy: 'admin.am@gms.com',
-      },
-    ];
+    await questionRepository.save(questions);
 
-    // Questions for Tech Quiz
-    const techQuestions = [
-      {
-        order: 1,
-        questionText: 'Apa langkah pertama dalam troubleshooting masalah IT?',
-        questionType: 'multiple-choice' as const,
-        options: [
-          'Restart sistem',
-          'Identifikasi dan pahami masalah',
-          'Ganti hardware',
-          'Install ulang software',
-        ],
-        correctAnswer: 'Identifikasi dan pahami masalah',
-        points: 10,
-        isRequired: true,
-        quizId: savedTechQuiz.id,
-        createdBy: 'admin.tech@gms.com',
-      },
-      {
-        order: 2,
-        questionText:
-          'Pilih semua soft skills yang penting untuk Technical Support:',
-        questionType: 'multiple-select' as const,
-        options: [
-          'Komunikasi yang baik',
-          'Kesabaran',
-          'Empati',
-          'Problem solving',
-          'Time management',
-          'Programming',
-        ],
-        correctAnswer:
-          'Komunikasi yang baik,Kesabaran,Empati,Problem solving,Time management',
-        points: 15,
-        isRequired: true,
-        quizId: savedTechQuiz.id,
-        createdBy: 'admin.tech@gms.com',
-      },
-    ];
+    // Create scoring template for the quiz
+    const scoring = {
+      quizId: quiz.id,
+      correctAnswers: 0,
+      points: 20, // Each correct answer = 20 points (5 questions × 20 = 100 points max)
+      isActive: true,
+      createdBy: 'superadmin@gms.com',
+      updatedBy: 'superadmin@gms.com',
+    };
 
-    await questionRepository.save([
-      ...smQuestions,
-      ...amQuestions,
-      ...techQuestions,
-    ]);
+    await scoringRepository.save(scoring);
 
-    console.log(
-      `✓ Seeded 3 quizzes with ${smQuestions.length + amQuestions.length + techQuestions.length} questions`,
-    );
-  }
-
-  private async seedUserQuizAssignments(): Promise<void> {
-    const assignmentRepository =
-      this.dataSource.getRepository(UserQuizAssignment);
-    const userRepository = this.dataSource.getRepository(User);
-    const quizRepository = this.dataSource.getRepository(Quiz);
-
-    // Check if assignments already exist
-    const existingAssignments = await assignmentRepository.count();
-    if (existingAssignments > 0) {
-      console.log(
-        `✓ User quiz assignments already exist (${existingAssignments} assignments), skipping seeding`,
-      );
-      return;
-    }
-
-    // Get users and quizzes
-    const smAdmins = await userRepository.find({
-      where: { role: 'admin' },
-    });
-
-    const quizzes = await quizRepository.find();
-
-    const assignments = [];
-
-    // Auto-assign quizzes based on service and location match
-    for (const admin of smAdmins) {
-      if (admin.serviceKey && admin.locationKey) {
-        const matchingQuizzes = quizzes.filter(
-          (quiz) =>
-            quiz.serviceKey === admin.serviceKey &&
-            quiz.locationKey === admin.locationKey,
-        );
-
-        for (const quiz of matchingQuizzes) {
-          assignments.push({
-            userId: admin.id,
-            quizId: quiz.id,
-            isActive: true,
-            assignedBy: 'system',
-            notes: `Auto-assigned based on service and location match`,
-            createdBy: 'system',
-            updatedBy: 'system',
-          });
-        }
-      }
-    }
-
-    if (assignments.length > 0) {
-      await assignmentRepository.save(assignments);
-      console.log(`✓ Seeded ${assignments.length} user quiz assignments`);
-    } else {
-      console.log('✓ No matching assignments to create');
-    }
+    console.log(`✓ Seeded 1 quiz with ${questions.length} questions and scoring template`);
   }
 }

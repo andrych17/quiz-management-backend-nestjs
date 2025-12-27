@@ -49,7 +49,7 @@ export class QuizService {
     private readonly urlGeneratorService: UrlGeneratorService,
     private readonly autoAssignmentService: AutoAssignmentService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   // Helper method to get full image URL from file server
   private getFullImageUrl(filePath: string): string {
@@ -129,7 +129,7 @@ export class QuizService {
           const correctAnswersSet = new Set(
             createQuizDto.scoringTemplates.map(t => t.correctAnswers)
           );
-          
+
           // Check apakah ada yang terlewat
           const missing = [];
           for (let i = 0; i <= totalQuestions; i++) {
@@ -137,7 +137,7 @@ export class QuizService {
               missing.push(i);
             }
           }
-          
+
           if (missing.length > 0) {
             throw new BadRequestException(
               `Template penilaian tidak lengkap. Belum ada template untuk: ${missing.join(', ')} jawaban benar. ` +
@@ -145,7 +145,7 @@ export class QuizService {
             );
           }
         }
-        
+
         const scoringTemplates = createQuizDto.scoringTemplates.map(
           (templateData) =>
             this.quizScoringRepository.create({
@@ -157,7 +157,7 @@ export class QuizService {
               updatedBy: userInfo?.email || userInfo?.name || 'system',
             }),
         );
-        
+
         savedScoringTemplates =
           await this.quizScoringRepository.save(scoringTemplates);
       }
@@ -172,24 +172,22 @@ export class QuizService {
           correctAnswerLength: q.correctAnswer ? q.correctAnswer.length : 'undefined',
           questionType: q.questionType
         })));
-        
+
         for (let i = 0; i < createQuizDto.questions.length; i++) {
           const questionData = createQuizDto.questions[i];
-          
-          // Text and essay questions don't need correct answers (open-ended)
-          const isOpenEnded = questionData.questionType === 'text' || questionData.questionType === 'essay';
+
+          // Text questions don't need correct answers (open-ended)
+          const isOpenEnded = questionData.questionType === 'text';
           if (!isOpenEnded && (!questionData.correctAnswer || questionData.correctAnswer.trim() === '')) {
             throw new BadRequestException(`Question ${i + 1}: correctAnswer is required and cannot be empty`);
           }
-          
+
           // Convert questionType to match enum values
           let questionType: string = questionData.questionType;
-          if (questionType === 'essay') {
-            questionType = 'text'; // Map essay to text
-          } else if (questionType.includes('_')) {
+          if (questionType.includes('_')) {
             questionType = questionType.replace('_', '-'); // Convert multiple_choice to multiple-choice
           }
-          
+
           const question = this.questionRepository.create({
             quizId: savedQuiz.id,
             questionText: questionData.questionText,
@@ -198,14 +196,14 @@ export class QuizService {
             correctAnswer: questionData.correctAnswer ? questionData.correctAnswer.trim() : '',
             order: questionData.order ?? i + 1, // Auto-generate order if not provided
           });
-          
+
           const savedQuestion = await this.questionRepository.save(question);
           console.log(`Saved question ${i + 1}:`, {
             id: savedQuestion.id,
             correctAnswer: savedQuestion.correctAnswer,
             questionText: savedQuestion.questionText.substring(0, 50) + '...'
           });
-          
+
           savedQuestions.push(savedQuestion);
         }
       }
@@ -293,6 +291,35 @@ export class QuizService {
         hasNext: page < totalPages,
         hasPrevious: page > 1,
       },
+    };
+  }
+
+  async findAllWithDisplayNames(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    isActive?: boolean,
+  ) {
+    // Get quiz data using existing method
+    const quizData = await this.findAll(page, limit, search, isActive);
+
+    // Get config mappings
+    const mappings = await this.configService.getMappings();
+
+    // Enhance quiz data with display names
+    const enhancedQuizzes = quizData.items.map((quiz) => ({
+      ...quiz,
+      serviceName: quiz.serviceKey
+        ? mappings.services.mapping[quiz.serviceKey] || quiz.serviceKey
+        : null,
+      locationName: quiz.locationKey
+        ? mappings.locations.mapping[quiz.locationKey] || quiz.locationKey
+        : null,
+    }));
+
+    return {
+      items: enhancedQuizzes,
+      pagination: quizData.pagination,
     };
   }
 
@@ -442,6 +469,9 @@ export class QuizService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
+    // Get config mappings for service and location names
+    const mappings = await this.configService.getMappings();
+
     // Get assigned users (admins who can access this quiz)
     const assignments = await this.userQuizAssignmentRepository.find({
       where: { quizId: id, isActive: true },
@@ -461,13 +491,13 @@ export class QuizService {
     // Transform questions to include options and correct answers
     const questions = quiz.questions
       ? quiz.questions.map((question) => ({
-          id: question.id,
-          questionText: question.questionText,
-          questionType: question.questionType,
-          order: question.order,
-          options: question.options,
-          correctAnswer: question.correctAnswer,
-        }))
+        id: question.id,
+        questionText: question.questionText,
+        questionType: question.questionType,
+        order: question.order,
+        options: question.options,
+        correctAnswer: question.correctAnswer,
+      }))
       : [];
 
     return {
@@ -475,6 +505,12 @@ export class QuizService {
       questions,
       assignedUsers,
       quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
+      serviceName: quiz.serviceKey
+        ? mappings.services.mapping[quiz.serviceKey] || quiz.serviceKey
+        : null,
+      locationName: quiz.locationKey
+        ? mappings.locations.mapping[quiz.locationKey] || quiz.locationKey
+        : null,
     } as QuizDetailResponseDto;
   }
 
@@ -512,7 +548,7 @@ export class QuizService {
       if (quiz.attempts && quiz.attempts.length > 0) {
         throw new BadRequestException(
           'Tidak dapat mengubah soal untuk quiz yang sudah dikerjakan oleh peserta. ' +
-            'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
+          'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
         );
       }
 
@@ -525,32 +561,28 @@ export class QuizService {
       if (questions.length > 0) {
         for (let i = 0; i < questions.length; i++) {
           const questionData = questions[i];
-          
+
           // Handle correctAnswer properly - now using correctAnswer (singular)
           let correctAnswer = '';
           if (questionData.correctAnswer) {
             correctAnswer = String(questionData.correctAnswer).trim();
           }
-          
-          // Essay questions don't need correct answers (check both questionType and correctAnswer content)
-          const isEssayQuestion = questionData.questionType === 'essay' || 
-                                 questionData.questionType === 'text' || 
-                                 correctAnswer === 'essay';
-          
-          if (!isEssayQuestion && !correctAnswer) {
+
+          // Text questions don't need correct answers (check both questionType and correctAnswer content)
+          const isTextQuestion = questionData.questionType === 'text' || correctAnswer === 'text';
+
+          if (!isTextQuestion && !correctAnswer) {
             throw new BadRequestException(`Question ${i + 1}: correctAnswer is required and cannot be empty`);
           }
-          
-          // For essay questions, clear the correctAnswer
-          if (isEssayQuestion) {
+
+          // For text questions, clear the correctAnswer
+          if (isTextQuestion) {
             correctAnswer = '';
           }
 
           // Convert questionType to match enum values
           let questionType: string = questionData.questionType;
-          if (questionType === 'essay') {
-            questionType = 'text'; // Map essay to text
-          } else if (questionType.includes('_')) {
+          if (questionType.includes('_')) {
             questionType = questionType.replace('_', '-'); // Convert multiple_choice to multiple-choice
           }
 
@@ -579,10 +611,10 @@ export class QuizService {
       if (quiz.attempts && quiz.attempts.length > 0) {
         throw new BadRequestException(
           'Tidak dapat mengubah template penilaian untuk quiz yang sudah dikerjakan oleh peserta. ' +
-            'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
+          'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
         );
       }
-      
+
       // Validasi: pastikan scoring templates mencakup semua kemungkinan correctAnswers
       if (scoringTemplates.length > 0) {
         const totalQuestions = quiz.questions?.length || 0;
@@ -590,7 +622,7 @@ export class QuizService {
           const correctAnswersSet = new Set(
             scoringTemplates.map(t => t.correctAnswers)
           );
-          
+
           // Check apakah ada yang terlewat
           const missing = [];
           for (let i = 0; i <= totalQuestions; i++) {
@@ -598,7 +630,7 @@ export class QuizService {
               missing.push(i);
             }
           }
-          
+
           if (missing.length > 0) {
             throw new BadRequestException(
               `Template penilaian tidak lengkap. Belum ada template untuk: ${missing.join(', ')} jawaban benar. ` +
@@ -607,7 +639,7 @@ export class QuizService {
           }
         }
       }
-      
+
       // Delete existing scoring templates
       await this.quizScoringRepository.delete({ quizId: id });
 
@@ -634,7 +666,7 @@ export class QuizService {
   }
 
   async publish(id: number): Promise<QuizDetailResponseDto> {
-    const quiz = await this.quizRepository.findOne({ 
+    const quiz = await this.quizRepository.findOne({
       where: { id },
       relations: ['questions', 'scoringTemplates']
     });
@@ -654,20 +686,20 @@ export class QuizService {
     }
 
     // Generate URLs when publishing (same as generate link)
-    let updateData: any = { 
-      isPublished: true, 
-      isActive: true 
+    let updateData: any = {
+      isPublished: true,
+      isActive: true
     };
 
     // Generate URLs if not already generated
     if (!quiz.normalUrl || !quiz.shortUrl) {
       if (quiz.slug && quiz.token) {
         const urls = await this.urlGeneratorService.generateQuizUrls(
-          quiz.slug, 
-          quiz.token, 
+          quiz.slug,
+          quiz.token,
           quiz.id
         );
-        
+
         updateData.normalUrl = urls.normalUrl;
         updateData.shortUrl = urls.shortUrl;
       }
@@ -740,7 +772,7 @@ export class QuizService {
     normalUrl: string;
     shortUrl: string;
   }> {
-    const quiz = await this.quizRepository.findOne({ 
+    const quiz = await this.quizRepository.findOne({
       where: { id },
       relations: ['attempts']
     });
@@ -753,13 +785,13 @@ export class QuizService {
     if (quiz.attempts && quiz.attempts.length > 0) {
       throw new BadRequestException(
         'Tidak dapat membuat ulang link untuk quiz yang sudah dikerjakan oleh peserta. ' +
-          'Hal ini untuk memastikan hasil quiz tetap valid dan menghindari kebingungan peserta.',
+        'Hal ini untuk memastikan hasil quiz tetap valid dan menghindari kebingungan peserta.',
       );
     }
 
     // Always regenerate token for new link (based on datetime)
     const newToken = generateUniqueToken();
-    
+
     console.log(`=== REGENERATE LINK FOR QUIZ ${id} ===`);
     console.log('Old token:', quiz.token);
     console.log('New token:', newToken);
@@ -774,13 +806,11 @@ export class QuizService {
         customAlias, // Pass custom alias if provided
       );
 
-      // Update quiz with new token and URLs, and publish it
+      // Update quiz with new token and URLs
       await this.quizRepository.update(id, {
         token: newToken,
         normalUrl: urls.normalUrl,
         shortUrl: urls.shortUrl,
-        isPublished: true,
-        isActive: true,
         updatedBy: userInfo?.email || userInfo?.name || 'system',
       });
 
@@ -887,6 +917,10 @@ export class QuizService {
         'Quiz not found or not published for public access',
       );
     }
+
+    // Get config mappings for service and location names
+    const mappings = await this.configService.getMappings();
+
     // Images are now handled at question level
     // Remove correctAnswer from questions for public access (security)
     const publicQuestions = quiz.questions?.map(q => {
@@ -899,6 +933,12 @@ export class QuizService {
       questions: publicQuestions, // Questions without correct answers
       images: [], // Images are now at question level
       quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
+      serviceName: quiz.serviceKey
+        ? mappings.services.mapping[quiz.serviceKey] || quiz.serviceKey
+        : null,
+      locationName: quiz.locationKey
+        ? mappings.locations.mapping[quiz.locationKey] || quiz.locationKey
+        : null,
     };
 
     return transformedQuiz;

@@ -24,11 +24,11 @@ export class CreateQuestionDto {
   @ApiProperty({
     example: 'multiple-choice',
     description: 'Type of question',
-    enum: ['multiple-choice', 'multiple-select', 'text', 'true-false', 'essay'],
+    enum: ['multiple-choice', 'multiple-select', 'text', 'true-false'],
   })
   @IsNotEmpty()
   @IsString()
-  questionType: 'multiple-choice' | 'multiple-select' | 'text' | 'true-false' | 'essay';
+  questionType: 'multiple-choice' | 'multiple-select' | 'text' | 'true-false';
 
   @ApiPropertyOptional({
     example: ['Paris', 'London', 'Berlin', 'Madrid'],
@@ -39,7 +39,7 @@ export class CreateQuestionDto {
   @IsString({ each: true })
   options?: string[];
 
-  @ApiPropertyOptional({ example: 'Paris', description: 'Correct answer (optional for essay questions)' })
+  @ApiPropertyOptional({ example: 'Paris', description: 'Correct answer' })
   @IsOptional()
   @IsString()
   correctAnswer?: string;
@@ -207,9 +207,9 @@ export class QuestionResponseDto {
   @ApiProperty({
     example: 'multiple-choice',
     description: 'Type of question',
-    enum: ['multiple-choice', 'multiple-select', 'text'],
+    enum: ['multiple-choice', 'multiple-select', 'text', 'true-false'],
   })
-  questionType: 'multiple-choice' | 'multiple-select' | 'text';
+  questionType: 'multiple-choice' | 'multiple-select' | 'text' | 'true-false';
 
   @ApiProperty({
     example: ['Paris', 'London', 'Berlin', 'Madrid'],

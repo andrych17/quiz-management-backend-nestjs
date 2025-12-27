@@ -5,11 +5,13 @@ import { ConfigService } from '@nestjs/config';
 export class UrlGeneratorService {
   private readonly frontendUrl: string;
   private readonly tinyUrlApiToken: string;
+  private readonly enableTinyUrl: boolean;
 
   constructor(private configService: ConfigService) {
     this.frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     this.tinyUrlApiToken = this.configService.get<string>('TINYURL_API_TOKEN');
+    this.enableTinyUrl = this.configService.get<boolean>('ENABLE_TINYURL') !== false;
   }
 
   /**
@@ -21,11 +23,13 @@ export class UrlGeneratorService {
   }
 
   /**
-   * Generate short URL using TinyURL API (temporarily disabled)
+   * Generate short URL using TinyURL API
    */
   async generateShortUrl(normalUrl: string, alias?: string): Promise<string> {
-    // Temporarily disable TinyURL - return normal URL
-    return normalUrl;
+    // Check if TinyURL is enabled
+    if (!this.enableTinyUrl) {
+      return normalUrl;
+    }
     
     if (!this.tinyUrlApiToken) {
       // Fallback to normal URL if TinyURL token not configured

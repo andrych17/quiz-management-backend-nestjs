@@ -35,10 +35,10 @@ export const databaseConfig = registerAs(
       UserQuizAssignment,
       QuizImage,
     ],
-    migrations: ['dist/migrations/*.js'],
+    migrations: ['dist/src/migrations/*.js'],
     synchronize: process.env.DATABASE_SYNCHRONIZE === 'true' || false,
     logging: process.env.NODE_ENV === 'production' ? false : (process.env.DATABASE_LOGGING === 'true' || false),
-    migrationsRun: true,
+    migrationsRun: process.env.DATABASE_MIGRATIONS_RUN === 'true' || false,
     autoLoadEntities: true,
     ssl: process.env.DATABASE_SSL === 'true' ? {
       rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false'

@@ -37,11 +37,11 @@ export class CreateQuestionForQuizDto {
   @ApiProperty({
     example: 'multiple-choice',
     description: 'Type of question',
-    enum: ['multiple-choice', 'multiple-select', 'text', 'true-false', 'essay'],
+    enum: ['multiple-choice', 'multiple-select', 'text', 'true-false'],
   })
   @IsNotEmpty()
   @IsString()
-  questionType: 'multiple-choice' | 'multiple-select' | 'text' | 'true-false' | 'essay';
+  questionType: 'multiple-choice' | 'multiple-select' | 'text' | 'true-false';
 
   @ApiPropertyOptional({
     example: ['Paris', 'London', 'Berlin', 'Madrid'],
@@ -52,7 +52,7 @@ export class CreateQuestionForQuizDto {
   @IsString({ each: true })
   options?: string[];
 
-  @ApiPropertyOptional({ example: 'Paris', description: 'Correct answer (optional for essay questions)' })
+  @ApiPropertyOptional({ example: 'Paris', description: 'Correct answer' })
   @IsOptional()
   @IsString({ message: 'correctAnswer must be a string' })
   correctAnswer?: string;
@@ -351,10 +351,10 @@ export class UpdateQuizDto {
   @IsOptional()
   questions?: Array<{
     questionText: string;
-    questionType: string; // Supports: 'multiple-choice', 'multiple-select', 'text', 'true-false', 'essay'
+    questionType: string; // Supports: 'multiple-choice', 'multiple-select', 'text', 'true-false'
     imageUrl?: string;
     options: string[];
-    correctAnswer?: string; // Optional for essay questions
+    correctAnswer?: string;
     points: number;
     order: number;
     isRequired: boolean;
@@ -390,6 +390,12 @@ export class QuizResponseDto {
   locationKey?: string;
 
   @ApiPropertyOptional({
+    example: 'Jakarta Pusat',
+    description: 'Location display name',
+  })
+  locationName?: string;
+
+  @ApiPropertyOptional({
     example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' },
     description: 'Location details',
   })
@@ -397,6 +403,12 @@ export class QuizResponseDto {
 
   @ApiPropertyOptional({ example: 'sm', description: 'Service key' })
   serviceKey?: string;
+
+  @ApiPropertyOptional({
+    example: 'Service Management',
+    description: 'Service display name',
+  })
+  serviceName?: string;
 
   @ApiPropertyOptional({
     example: { id: 1, key: 'sm', value: 'Service Management' },
