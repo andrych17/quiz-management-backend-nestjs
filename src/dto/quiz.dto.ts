@@ -361,6 +361,11 @@ export class UpdateQuizDto {
     imageBase64?: string;
     imageOriginalName?: string;
     imageAltText?: string;
+    imagesBase64?: Array<{
+      imageBase64: string;
+      originalName?: string;
+      altText?: string;
+    }>;
   }>;
 }
 

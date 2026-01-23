@@ -7,6 +7,7 @@ import { ResponseInterceptor } from './interceptors/response.interceptor';
 import { GlobalExceptionFilter } from './filters/global-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -14,6 +15,11 @@ async function bootstrap() {
     bufferLogs: false,
     abortOnError: false,
   });
+
+  // Increase payload size limit for base64 image uploads (default 100kb is too small)
+  // Base64 encoded images are ~33% larger, so 10MB limit accommodates 5MB+ images
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Only serve static files in development or if needed
   if (process.env.NODE_ENV !== 'production') {

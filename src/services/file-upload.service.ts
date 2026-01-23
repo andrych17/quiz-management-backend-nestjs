@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { R2StorageService } from './r2-storage.service';
 import * as path from 'path';
 
 @Injectable()
 export class FileUploadService {
+  private readonly logger = new Logger(FileUploadService.name);
   private readonly maxFileSize: number = 5 * 1024 * 1024; // 5MB in bytes
   private readonly allowedMimeTypes = [
     'image/jpeg',
@@ -37,7 +38,7 @@ export class FileUploadService {
     // Check MIME type
     if (!this.allowedMimeTypes.includes(mimeType)) {
       throw new BadRequestException(
-        `Tipe file tidak didukung. Hanya menerima: ${this.allowedMimeTypes.join(', ')}`,
+        `Tipe file tidak didukung (${mimeType}). Hanya menerima: ${this.allowedMimeTypes.join(', ')}`,
       );
     }
 
@@ -46,7 +47,7 @@ export class FileUploadService {
     const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
     if (!validExtensions.includes(ext)) {
       throw new BadRequestException(
-        `Ekstensi file tidak valid. Hanya menerima: ${validExtensions.join(', ')}`,
+        `Ekstensi file tidak valid (${ext}). Hanya menerima: ${validExtensions.join(', ')}. File: ${originalName}`,
       );
     }
   }
@@ -61,15 +62,18 @@ export class FileUploadService {
     prefix: string = 'quiz',
   ): Promise<{
     fileName: string;
-    filePath: string;
     fileSize: number;
     mimeType: string;
     originalName: string;
   }> {
-    // Validate image
-    this.validateImage(fileBuffer, mimeType, originalName);
-
     try {
+      // Validate image
+      this.validateImage(fileBuffer, mimeType, originalName);
+
+      this.logger.debug(
+        `Uploading image: ${originalName} (${mimeType}, ${fileBuffer.length} bytes) with prefix: ${prefix}`,
+      );
+
       // Upload to R2 storage
       const uploadResult = await this.r2StorageService.uploadFile(
         fileBuffer,
@@ -78,14 +82,21 @@ export class FileUploadService {
         prefix,
       );
 
+      this.logger.log(
+        `Image uploaded successfully: ${originalName} -> ${uploadResult.objectKey}`,
+      );
+
       return {
         fileName: uploadResult.objectKey, // R2 object key
-        filePath: uploadResult.backendUrl, // Backend API URL (not direct R2 URL)
         fileSize: uploadResult.fileSize,
         mimeType,
         originalName,
       };
     } catch (error) {
+      this.logger.error(
+        `Failed to upload image ${originalName}: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException(`Gagal menyimpan file ke cloud storage: ${error.message}`);
     }
   }
@@ -110,9 +121,9 @@ export class FileUploadService {
   }
 
   /**
-   * Decode base64 image
+   * Decode base64 image and infer MIME type from file extension if needed
    */
-  decodeBase64Image(base64String: string): {
+  decodeBase64Image(base64String: string, originalName?: string): {
     buffer: Buffer;
     mimeType: string;
   } {
@@ -126,10 +137,24 @@ export class FileUploadService {
         mimeType: matches[1],
       };
     } else {
-      // Plain base64 string (assume JPEG)
+      // Plain base64 string - infer MIME type from filename extension if provided
+      let mimeType = 'image/jpeg'; // default
+      
+      if (originalName) {
+        const ext = path.extname(originalName).toLowerCase();
+        const mimeTypeMap: { [key: string]: string } = {
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.png': 'image/png',
+          '.gif': 'image/gif',
+          '.webp': 'image/webp',
+        };
+        mimeType = mimeTypeMap[ext] || 'image/jpeg';
+      }
+      
       return {
         buffer: Buffer.from(base64String, 'base64'),
-        mimeType: 'image/jpeg',
+        mimeType,
       };
     }
   }
@@ -143,12 +168,20 @@ export class FileUploadService {
     prefix: string = 'quiz',
   ): Promise<{
     fileName: string;
-    filePath: string;
     fileSize: number;
     mimeType: string;
     originalName: string;
   }> {
-    const { buffer, mimeType } = this.decodeBase64Image(base64String);
+    // Validate base64 string size (base64 is ~33% larger than binary, so limit accordingly)
+    // 5MB binary = ~6.67MB base64
+    const maxBase64Size = 6.7 * 1024 * 1024; // 6.7MB
+    if (base64String.length > maxBase64Size) {
+      throw new BadRequestException(
+        `Ukuran file base64 terlalu besar (${(base64String.length / 1024 / 1024).toFixed(2)}MB). Maksimal 5MB`,
+      );
+    }
+
+    const { buffer, mimeType } = this.decodeBase64Image(base64String, originalName);
     return this.saveImage(buffer, originalName, mimeType, prefix);
   }
 

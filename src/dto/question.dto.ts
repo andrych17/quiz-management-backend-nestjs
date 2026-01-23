@@ -75,6 +75,26 @@ export class CreateQuestionDto {
   imageAltText?: string;
 
   @ApiPropertyOptional({
+    description: 'Array of base64 images for multi-image support (max 5MB each)',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        imageBase64: { type: 'string', description: 'Base64 encoded image' },
+        originalName: { type: 'string', description: 'Original filename' },
+        altText: { type: 'string', description: 'Alt text for image' },
+      },
+    },
+  })
+  @IsOptional()
+  @IsArray()
+  imagesBase64?: Array<{
+    imageBase64: string;
+    originalName?: string;
+    altText?: string;
+  }>;
+
+  @ApiPropertyOptional({
     description:
       'Pre-uploaded question images (advanced usage - normally use imageBase64)',
     type: 'array',
@@ -161,6 +181,26 @@ export class UpdateQuestionDto {
   @IsOptional()
   @IsString()
   imageAltText?: string;
+
+  @ApiPropertyOptional({
+    description: 'Array of base64 images for multi-image support (max 5MB each). Will replace all existing images.',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        imageBase64: { type: 'string', description: 'Base64 encoded image' },
+        originalName: { type: 'string', description: 'Original filename' },
+        altText: { type: 'string', description: 'Alt text for image' },
+      },
+    },
+  })
+  @IsOptional()
+  @IsArray()
+  imagesBase64?: Array<{
+    imageBase64: string;
+    originalName?: string;
+    altText?: string;
+  }>;
 
   @ApiPropertyOptional({
     description:

@@ -30,9 +30,6 @@ export class QuizImage {
   @Column()
   fileSize: number; // in bytes
 
-  @Column()
-  filePath: string; // storage path
-
   @Column({ nullable: true })
   altText: string;
 

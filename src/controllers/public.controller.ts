@@ -15,7 +15,6 @@ import {
 } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { AttemptService } from '../services/attempt.service';
-import { QuestionService } from '../services/question.service';
 import { CreateAttemptDto } from '../dto/attempt.dto';
 import { QuizResponseDto } from '../dto/quiz.dto';
 import {
@@ -29,7 +28,6 @@ export class PublicController {
   constructor(
     private readonly quizService: QuizService,
     private readonly attemptService: AttemptService,
-    private readonly questionService: QuestionService,
   ) {}
 
   /**
@@ -78,40 +76,18 @@ export class PublicController {
     const actualToken = this.extractToken(token);
     const quiz = await this.quizService.findByTokenPublic(actualToken);
     
-    // Get quiz questions WITH images
-    const questions = await this.questionService.findByQuizIdWithImages(quiz.id);
-    
+    // Transform quiz response to include images in questions
     const result = {
       ...quiz,
-      questions: questions.map(q => {
-        // Check if question has multiple correct answers
-        let isMultipleAnswer = false;
-        if (q.correctAnswer) {
-          try {
-            // Check if correctAnswer is an array or contains multiple answers
-            const correctAnswers = Array.isArray(q.correctAnswer) 
-              ? q.correctAnswer 
-              : (typeof q.correctAnswer === 'string' && q.correctAnswer.includes(','))
-                ? q.correctAnswer.split(',').map(a => a.trim())
-                : [q.correctAnswer];
-            
-            isMultipleAnswer = correctAnswers.length > 1;
-          } catch (e) {
-            isMultipleAnswer = false;
-          }
-        }
-
-        return {
-          id: q.id,
-          questionText: q.questionText,
-          questionType: q.questionType,
-          options: q.options,
-          order: q.order,
-          isMultipleAnswer: isMultipleAnswer,
-          images: q.images || [] // Include images in public quiz response
-          // Don't include correctAnswer for public access
-        };
-      })
+      questions: (quiz as any).questions?.map((q: any) => ({
+        id: q.id,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        options: q.options,
+        order: q.order,
+        images: q.images || [], // Include images from question
+        // correctAnswer is already excluded by findByTokenPublic
+      })) || []
     };
     
     return ResponseFactory.success(result, 'Data quiz dan soal berhasil diambil');

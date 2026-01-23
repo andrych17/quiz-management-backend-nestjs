@@ -19,18 +19,18 @@ export class FileController {
    * Serve file from private R2 bucket
    * This endpoint acts as a proxy, keeping the R2 bucket private
    */
-  @Get('*objectKey')
+  @Get('*')
   @ApiOperation({ 
     summary: 'Get file from cloud storage',
     description: 'Retrieves and serves files from private R2 bucket. Supports caching headers.'
   })
   @ApiParam({ 
-    name: 'objectKey', 
-    description: 'R2 object key (e.g., quiz-images/123456_abc.jpg)',
-    example: 'quiz-images/1234567890_abc123_image.jpg'
+    name: '0', 
+    description: 'R2 object key with full path (e.g., question/123/image.jpg)',
+    example: 'question/516/1234567890_abc123_image.jpg'
   })
   async getFile(
-    @Param('objectKey') objectKey: string,
+    @Param('0') objectKey: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     try {

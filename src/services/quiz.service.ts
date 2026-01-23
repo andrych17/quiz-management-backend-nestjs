@@ -23,6 +23,7 @@ import { generateSlug, generateToken, generateUniqueToken } from '../lib/utils';
 import { UrlGeneratorService } from './url-generator.service';
 import { AutoAssignmentService } from './auto-assignment.service';
 import { ConfigService } from './config.service';
+import { FileUploadService } from './file-upload.service';
 
 interface UserInfo {
   id?: number;
@@ -49,6 +50,7 @@ export class QuizService {
     private readonly urlGeneratorService: UrlGeneratorService,
     private readonly autoAssignmentService: AutoAssignmentService,
     private readonly configService: ConfigService,
+    private readonly fileUploadService: FileUploadService,
   ) { }
 
   // Helper method to get full image URL from file server
@@ -469,6 +471,35 @@ export class QuizService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
+    // Load images for each question
+    let questionsWithImages = [];
+    if (quiz.questions && quiz.questions.length > 0) {
+      questionsWithImages = await Promise.all(
+        quiz.questions.map(async (question) => {
+          const images = await this.quizImageRepository.find({
+            where: { questionId: question.id, isActive: true },
+          });
+          return {
+            id: question.id,
+            questionText: question.questionText,
+            questionType: question.questionType,
+            order: question.order,
+            options: question.options,
+            correctAnswer: question.correctAnswer,
+            images: images.map((img) => ({
+              id: img.id,
+              fileName: img.fileName,
+              originalName: img.originalName,
+              mimeType: img.mimeType,
+              fileSize: img.fileSize,
+              altText: img.altText,
+              downloadUrl: `/api/files/${img.fileName}`,
+            })),
+          };
+        }),
+      );
+    }
+
     // Get config mappings for service and location names
     const mappings = await this.configService.getMappings();
 
@@ -488,21 +519,9 @@ export class QuizService {
       isActive: assignment.isActive,
     }));
 
-    // Transform questions to include options and correct answers
-    const questions = quiz.questions
-      ? quiz.questions.map((question) => ({
-        id: question.id,
-        questionText: question.questionText,
-        questionType: question.questionType,
-        order: question.order,
-        options: question.options,
-        correctAnswer: question.correctAnswer,
-      }))
-      : [];
-
     return {
       ...quiz,
-      questions,
+      questions: questionsWithImages,
       assignedUsers,
       quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
       serviceName: quiz.serviceKey
@@ -601,6 +620,68 @@ export class QuizService {
             correctAnswer: savedQuestion.correctAnswer,
             questionText: savedQuestion.questionText.substring(0, 50) + '...'
           });
+
+          // Handle multiple images upload (new multi-image support)
+          if (questionData.imagesBase64 && questionData.imagesBase64.length > 0) {
+            try {
+              for (let imgIdx = 0; imgIdx < questionData.imagesBase64.length; imgIdx++) {
+                const imgData = questionData.imagesBase64[imgIdx];
+                const fileInfo = await this.fileUploadService.uploadFromBase64(
+                  imgData.imageBase64,
+                  imgData.originalName || `question_image_${imgIdx + 1}.jpg`,
+                  `question/${savedQuestion.id}`,
+                );
+
+                const imageRecord = this.quizImageRepository.create({
+                  questionId: savedQuestion.id,
+                  fileName: fileInfo.fileName,
+                  originalName: fileInfo.originalName,
+                  mimeType: fileInfo.mimeType,
+                  fileSize: fileInfo.fileSize,
+                  altText: imgData.altText,
+                  isActive: true,
+                });
+
+                await this.quizImageRepository.save(imageRecord);
+              }
+              console.log(`Saved ${questionData.imagesBase64.length} images for question ${i + 1}`);
+            } catch (uploadError) {
+              console.error(`Failed to upload images for question ${i + 1}:`, uploadError.message);
+              throw new BadRequestException(
+                `Question ${i + 1}: Gagal upload gambar - ${uploadError.message}`,
+              );
+            }
+          }
+          // Fallback to single image upload (backward compatibility)
+          else if (questionData.imageBase64) {
+            try {
+              const fileInfo = await this.fileUploadService.uploadFromBase64(
+                questionData.imageBase64,
+                questionData.imageOriginalName || 'question_image.jpg',
+                `question/${savedQuestion.id}`,
+              );
+
+              const imageRecord = this.quizImageRepository.create({
+                questionId: savedQuestion.id,
+                fileName: fileInfo.fileName,
+                originalName: fileInfo.originalName,
+                mimeType: fileInfo.mimeType,
+                fileSize: fileInfo.fileSize,
+                altText: questionData.imageAltText,
+                isActive: true,
+              });
+
+              await this.quizImageRepository.save(imageRecord);
+              console.log(`Saved image for question ${i + 1}:`, {
+                fileName: fileInfo.fileName,
+              });
+            } catch (uploadError) {
+              console.error(`Failed to upload image for question ${i + 1}:`, uploadError.message);
+              throw new BadRequestException(
+                `Question ${i + 1}: Gagal upload gambar - ${uploadError.message}`,
+              );
+            }
+          }
         }
       }
     }
@@ -741,7 +822,30 @@ export class QuizService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    return quiz.questions.sort((a, b) => a.order - b.order);
+    // Load images for each question
+    const questionsWithImages = await Promise.all(
+      quiz.questions
+        .sort((a, b) => a.order - b.order)
+        .map(async (question) => {
+          const images = await this.quizImageRepository.find({
+            where: { questionId: question.id, isActive: true },
+          });
+          return {
+            ...question,
+            images: images.map((img) => ({
+              id: img.id,
+              fileName: img.fileName,
+              originalName: img.originalName,
+              mimeType: img.mimeType,
+              fileSize: img.fileSize,
+              altText: img.altText,
+              downloadUrl: `/api/files/${img.fileName}`,
+            })),
+          };
+        }),
+    );
+
+    return questionsWithImages;
   }
 
   async getAttempts(id: number) {
@@ -921,16 +1025,31 @@ export class QuizService {
     // Get config mappings for service and location names
     const mappings = await this.configService.getMappings();
 
-    // Images are now handled at question level
-    // Remove correctAnswer from questions for public access (security)
-    const publicQuestions = quiz.questions?.map(q => {
-      const { correctAnswer, ...questionWithoutAnswer } = q;
-      return questionWithoutAnswer;
-    });
+    // Load images for each question and remove correctAnswer for security
+    const publicQuestions = await Promise.all(
+      quiz.questions?.map(async (q) => {
+        const images = await this.quizImageRepository.find({
+          where: { questionId: q.id, isActive: true },
+        });
+        const { correctAnswer, ...questionWithoutAnswer } = q;
+        return {
+          ...questionWithoutAnswer,
+          images: images.map((img) => ({
+            id: img.id,
+            fileName: img.fileName,
+            originalName: img.originalName,
+            mimeType: img.mimeType,
+            fileSize: img.fileSize,
+            altText: img.altText,
+            downloadUrl: `/api/files/${img.fileName}`,
+          })),
+        };
+      }) || []
+    );
 
     const transformedQuiz = {
       ...quiz,
-      questions: publicQuestions, // Questions without correct answers
+      questions: publicQuestions, // Questions without correct answers but with images
       images: [], // Images are now at question level
       quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
       serviceName: quiz.serviceKey

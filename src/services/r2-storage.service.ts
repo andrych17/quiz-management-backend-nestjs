@@ -63,7 +63,8 @@ export class R2StorageService {
   ): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
-    const sanitizedPrefix = prefix.replace(/[^a-z0-9]/gi, '_');
+    // Allow forward slashes in prefix (for nested paths like question/5)
+    const sanitizedPrefix = prefix.replace(/[^a-z0-9\/]/gi, '_');
     const sanitizedFileName = fileName.replace(/[^a-z0-9.]/gi, '_');
 
     return `${sanitizedPrefix}/${timestamp}_${random}_${sanitizedFileName}`;
