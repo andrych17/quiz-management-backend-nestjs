@@ -85,6 +85,8 @@ export class AttemptService {
       participantName: createAttemptDto.participantName,
       email: createAttemptDto.email,
       nij: createAttemptDto.nij,
+      servoNumber: createAttemptDto.servoNumber,
+      serviceKey: createAttemptDto.serviceKey,
       startedAt: new Date(),
       // No score, no completion time yet
     });
@@ -155,6 +157,8 @@ export class AttemptService {
       participantName: createAttemptDto.participantName,
       email: createAttemptDto.email,
       nij: createAttemptDto.nij,
+      servoNumber: createAttemptDto.servoNumber,
+      serviceKey: createAttemptDto.serviceKey,
       startedAt: new Date(),
     });
 
@@ -190,24 +194,48 @@ export class AttemptService {
     let grade = 'F';
     let passed = false;
 
+    DebugLogger.debug('AttemptService', 'Calculating score', {
+      correctAnswers,
+      totalQuestions,
+      hasScoringTemplates: quiz.scoringTemplates?.length > 0,
+      scoringTemplatesCount: quiz.scoringTemplates?.length || 0,
+    });
+
     if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
-      // Mode IPK: Cari nilai berdasarkan jumlah benar
+      // Mode IQ/Custom Scoring: Cari nilai berdasarkan jumlah benar
       const matchingTemplate = quiz.scoringTemplates.find(
-        (template) =>
-          correctAnswers >= template.minScore &&
-          correctAnswers <= template.maxScore,
+        (template) => template.correctAnswers === correctAnswers,
       );
 
+      DebugLogger.debug('AttemptService', 'Searching for matching template', {
+        correctAnswers,
+        matchingTemplate: matchingTemplate
+          ? {
+              id: matchingTemplate.id,
+              correctAnswers: matchingTemplate.correctAnswers,
+              points: matchingTemplate.points,
+            }
+          : null,
+      });
+
       if (matchingTemplate) {
-        finalScore = matchingTemplate.correctAnswerPoints; // Nilai akhir (70, 80, 90, dll)
-        grade = matchingTemplate.scoringName; // Grade (A, B, C, dll)
+        finalScore = matchingTemplate.points; // Nilai akhir dari tabel konversi (73, 74, 72, dll)
+        DebugLogger.success('AttemptService', 'Using scoring template', {
+          finalScore,
+        });
       } else {
         // Fallback ke standard scoring (0-100) jika tidak ada template yang cocok
         finalScore = Math.round((correctAnswers / totalQuestions) * 100);
+        DebugLogger.warn('AttemptService', 'No matching template, using fallback', {
+          finalScore,
+        });
       }
     } else {
       // Mode default: gunakan standard scoring (0-100)
       finalScore = Math.round((correctAnswers / totalQuestions) * 100);
+      DebugLogger.debug('AttemptService', 'No scoring templates, using default', {
+        finalScore,
+      });
     }
 
     passed = finalScore >= (quiz.passingScore || 70);
@@ -350,11 +378,19 @@ export class AttemptService {
       queryBuilder.andWhere('attempt.quizId = :quizId', { quizId });
     }
 
-    if (serviceKey && serviceKey !== 'all_services' && !serviceKey.startsWith('all_')) {
+    if (
+      serviceKey &&
+      serviceKey !== 'all_services' &&
+      !serviceKey.startsWith('all_')
+    ) {
       queryBuilder.andWhere('quiz.serviceKey = :serviceKey', { serviceKey });
     }
 
-    if (locationKey && locationKey !== 'all_locations' && !locationKey.startsWith('all_')) {
+    if (
+      locationKey &&
+      locationKey !== 'all_locations' &&
+      !locationKey.startsWith('all_')
+    ) {
       queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
     }
 
@@ -363,10 +399,15 @@ export class AttemptService {
       .getMany();
 
     if (attempts.length === 0) {
-      throw new NotFoundException('No attempts found with the specified filters');
+      throw new NotFoundException(
+        'No attempts found with the specified filters',
+      );
     }
 
-    DebugLogger.debug('AttemptService', `Exporting ${attempts.length} attempts to Excel`);
+    DebugLogger.debug(
+      'AttemptService',
+      `Exporting ${attempts.length} attempts to Excel`,
+    );
 
     // Create workbook and worksheet
     const workbook = new ExcelJS.Workbook();
@@ -407,7 +448,7 @@ export class AttemptService {
         score: attempt.score,
         correctAnswers: attempt.correctAnswers,
         totalQuestions: attempt.totalQuestions,
-        passed: attempt.passed ? 'Yes': 'No',
+        passed: attempt.passed ? 'Yes' : 'No',
         startedAt: attempt.startedAt
           ? new Date(attempt.startedAt).toLocaleString('id-ID')
           : '-',
@@ -436,7 +477,18 @@ export class AttemptService {
     });
 
     // Add title row
-    worksheet.insertRow(1, ['Quiz Results Export', '', '', '', '', '', '', '', '', '']);
+    worksheet.insertRow(1, [
+      'Quiz Results Export',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ]);
     const titleRow = worksheet.getRow(1);
     titleRow.font = { bold: true, size: 14 };
     titleRow.height = 25;
@@ -444,9 +496,12 @@ export class AttemptService {
     // Add summary row
     const summaryRowIndex = worksheet.rowCount + 2;
     worksheet.getCell(`A${summaryRowIndex}`).value = 'Summary:';
-    worksheet.getCell(`B${summaryRowIndex}`).value = `Total Attempts: ${attempts.length}`;
-    worksheet.getCell(`D${summaryRowIndex}`).value = `Passed: ${attempts.filter((a) => a.passed).length}`;
-    worksheet.getCell(`F${summaryRowIndex}`).value = `Failed: ${attempts.filter((a) => !a.passed).length}`;
+    worksheet.getCell(`B${summaryRowIndex}`).value =
+      `Total Attempts: ${attempts.length}`;
+    worksheet.getCell(`D${summaryRowIndex}`).value =
+      `Passed: ${attempts.filter((a) => a.passed).length}`;
+    worksheet.getCell(`F${summaryRowIndex}`).value =
+      `Failed: ${attempts.filter((a) => !a.passed).length}`;
 
     const summaryRow = worksheet.getRow(summaryRowIndex);
     summaryRow.font = { bold: true };
@@ -489,7 +544,7 @@ export class AttemptService {
     endDate?: string,
   ) {
     const skip = (page - 1) * limit;
-    
+
     // Build query - simplified tanpa leftJoinAndSelect answers
     const queryBuilder = this.attemptRepository
       .createQueryBuilder('attempt')
@@ -508,12 +563,20 @@ export class AttemptService {
     }
 
     // Filter by service
-    if (serviceKey && serviceKey !== 'all_services' && !serviceKey.startsWith('all_')) {
+    if (
+      serviceKey &&
+      serviceKey !== 'all_services' &&
+      !serviceKey.startsWith('all_')
+    ) {
       queryBuilder.andWhere('quiz.serviceKey = :serviceKey', { serviceKey });
     }
 
     // Filter by location
-    if (locationKey && locationKey !== 'all_locations' && !locationKey.startsWith('all_')) {
+    if (
+      locationKey &&
+      locationKey !== 'all_locations' &&
+      !locationKey.startsWith('all_')
+    ) {
       queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
     }
 
@@ -521,19 +584,23 @@ export class AttemptService {
     if (search) {
       queryBuilder.andWhere(
         '(UPPER(attempt.participantName) LIKE UPPER(:search) OR ' +
-        'UPPER(attempt.email) LIKE UPPER(:search) OR ' +
-        'UPPER(attempt.nij) LIKE UPPER(:search) OR ' +
-        'UPPER(quiz.title) LIKE UPPER(:search))',
-        { search: `%${search}%` }
+          'UPPER(attempt.email) LIKE UPPER(:search) OR ' +
+          'UPPER(attempt.nij) LIKE UPPER(:search) OR ' +
+          'UPPER(quiz.title) LIKE UPPER(:search))',
+        { search: `%${search}%` },
       );
     }
 
     // Date range filter
     if (startDate) {
-      queryBuilder.andWhere('attempt.startedAt >= :startDate', { startDate: new Date(startDate) });
+      queryBuilder.andWhere('attempt.startedAt >= :startDate', {
+        startDate: new Date(startDate),
+      });
     }
     if (endDate) {
-      queryBuilder.andWhere('attempt.startedAt <= :endDate', { endDate: new Date(endDate) });
+      queryBuilder.andWhere('attempt.startedAt <= :endDate', {
+        endDate: new Date(endDate),
+      });
     }
 
     // Get total count
@@ -555,15 +622,19 @@ export class AttemptService {
       participantName: attempt.participantName,
       email: attempt.email,
       nij: attempt.nij,
+      servoNumber: attempt.servoNumber,
+      serviceKey: attempt.serviceKey,
       quizId: attempt.quizId,
       quizTitle: attempt.quiz?.title || 'Unknown Quiz',
-      serviceKey: attempt.quiz?.serviceKey,
-      serviceName: attempt.quiz?.serviceKey 
-        ? mappings.services.mapping[attempt.quiz.serviceKey] || attempt.quiz.serviceKey 
+      quizServiceKey: attempt.quiz?.serviceKey,
+      quizServiceName: attempt.quiz?.serviceKey
+        ? mappings.services.mapping[attempt.quiz.serviceKey] ||
+          attempt.quiz.serviceKey
         : 'No Service',
       locationKey: attempt.quiz?.locationKey,
-      locationName: attempt.quiz?.locationKey 
-        ? mappings.locations.mapping[attempt.quiz.locationKey] || attempt.quiz.locationKey 
+      locationName: attempt.quiz?.locationKey
+        ? mappings.locations.mapping[attempt.quiz.locationKey] ||
+          attempt.quiz.locationKey
         : 'No Location',
       score: attempt.score,
       correctAnswers: attempt.correctAnswers,
@@ -624,11 +695,12 @@ export class AttemptService {
     // Map all questions to answers (or placeholder if no answer)
     const detailedAnswers = questions.map((question, index) => {
       const answer = answersMap.get(question.id);
-      
+
       // If answer exists, use it; otherwise return "unanswered" state
       const answerText = answer ? answer.answerText : null;
       const isCorrect = answerText === question.correctAnswer;
-      const isSkipped = answerText === null || answerText === undefined || answerText === '';
+      const isSkipped =
+        answerText === null || answerText === undefined || answerText === '';
 
       return {
         id: answer ? answer.id : null,
@@ -649,17 +721,21 @@ export class AttemptService {
       participantName: attempt.participantName,
       email: attempt.email,
       nij: attempt.nij,
+      servoNumber: attempt.servoNumber,
+      serviceKey: attempt.serviceKey,
       quiz: {
         id: attempt.quiz.id,
         title: attempt.quiz.title,
         description: attempt.quiz.description,
         serviceKey: attempt.quiz.serviceKey,
-        serviceName: attempt.quiz.serviceKey 
-          ? mappings.services.mapping[attempt.quiz.serviceKey] || attempt.quiz.serviceKey 
+        serviceName: attempt.quiz.serviceKey
+          ? mappings.services.mapping[attempt.quiz.serviceKey] ||
+            attempt.quiz.serviceKey
           : 'No Service',
         locationKey: attempt.quiz.locationKey,
-        locationName: attempt.quiz.locationKey 
-          ? mappings.locations.mapping[attempt.quiz.locationKey] || attempt.quiz.locationKey 
+        locationName: attempt.quiz.locationKey
+          ? mappings.locations.mapping[attempt.quiz.locationKey] ||
+            attempt.quiz.locationKey
           : 'No Location',
         passingScore: attempt.quiz.passingScore,
         createdAt: attempt.quiz.createdAt,
@@ -674,11 +750,13 @@ export class AttemptService {
       answers: detailedAnswers,
       summary: {
         totalQuestions: questions.length,
-        correctAnswers: detailedAnswers.filter(a => a.isCorrect).length,
-        wrongAnswers: detailedAnswers.filter(a => !a.isCorrect && !a.isSkipped).length,
-        skippedAnswers: detailedAnswers.filter(a => a.isSkipped).length,
-        score: attempt.score
-      }
+        correctAnswers: detailedAnswers.filter((a) => a.isCorrect).length,
+        wrongAnswers: detailedAnswers.filter(
+          (a) => !a.isCorrect && !a.isSkipped,
+        ).length,
+        skippedAnswers: detailedAnswers.filter((a) => a.isSkipped).length,
+        score: attempt.score,
+      },
     };
   }
 }

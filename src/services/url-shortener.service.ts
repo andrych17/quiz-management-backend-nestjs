@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import { DebugLogger } from '../lib/debug-logger';
 
 @Injectable()
 export class UrlShortenerService {
@@ -16,7 +17,10 @@ export class UrlShortenerService {
   async shortenUrl(longUrl: string, alias?: string): Promise<string> {
     try {
       if (!this.tinyUrlApiToken) {
-        console.warn('TinyURL not configured, returning original URL');
+        DebugLogger.warn(
+          'UrlShortenerService',
+          'TinyURL not configured, returning original URL',
+        );
         return longUrl;
       }
 
@@ -48,11 +52,11 @@ export class UrlShortenerService {
       // Fallback to original URL if API response is unexpected
       return longUrl;
     } catch (error) {
-      console.error(
-        'Error shortening URL with TinyURL:',
+      DebugLogger.error(
+        'UrlShortenerService',
+        'Error shortening URL',
         error.response?.data || error.message,
       );
-      // Fallback to original URL if shortening fails
       return longUrl;
     }
   }

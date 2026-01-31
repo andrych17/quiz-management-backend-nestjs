@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run migration:generate:*)",
+      "Bash(npm run migration:run:*)",
+      "Bash(ping:*)"
+    ]
+  }
+}

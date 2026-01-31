@@ -83,7 +83,7 @@ async function bootstrap() {
   console.log(`🚀 Application is running on: http://0.0.0.0:${port}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🎯 Port: ${port}`);
-  
+
   // Only log URLs in development
   if (process.env.NODE_ENV !== 'production') {
     console.log(`Frontend URL: ${APP_URLS.FRONTEND_URL}`);

@@ -36,7 +36,9 @@ export class AttemptAnswer {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => Attempt, (attempt) => attempt.answers, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Attempt, (attempt) => attempt.answers, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'attemptId' })
   attempt: Attempt;
 

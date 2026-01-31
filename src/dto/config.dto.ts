@@ -47,6 +47,16 @@ export class CreateConfigItemDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Display to user in public quiz form (only used for services group)',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isDisplayToUser?: boolean;
 }
 
 export class UpdateConfigItemDto {
@@ -88,6 +98,15 @@ export class UpdateConfigItemDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Display to user in public quiz form (only used for services group)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isDisplayToUser?: boolean;
 }
 
 export class ConfigItemResponseDto {
@@ -117,6 +136,13 @@ export class ConfigItemResponseDto {
 
   @ApiProperty({ example: true, description: 'Active status' })
   isActive: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Display to user in public quiz form (only for services group, null for others)',
+  })
+  isDisplayToUser?: boolean;
 
   @ApiProperty({ example: 'admin', description: 'Created by user' })
   createdBy: string;

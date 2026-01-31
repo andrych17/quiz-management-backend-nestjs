@@ -19,11 +19,44 @@ export class QuizScoring {
   @Column()
   quizId: number;
 
-  @Column({ type: 'int', default: 0 })
-  correctAnswers: number; // Jumlah jawaban benar
+  @Column({ nullable: true })
+  scoringName: string; // Nama template scoring (A, B, C, dll atau deskripsi lain)
 
-  @Column({ type: 'int', default: 1 })
-  points: number; // Point per jawaban (default 1, score dihitung sebagai correctAnswers × points)
+  @Column({ type: 'int', default: 0 })
+  correctAnswers: number; // Jumlah jawaban benar untuk mapping ini
+
+  @Column({ type: 'int', default: 0 })
+  points: number; // Skor akhir untuk jumlah jawaban benar tersebut (untuk IQ test: 70, 73, 74, dll)
+
+  @Column({ type: 'int', nullable: true })
+  correctAnswerPoints: number; // Alias untuk points (untuk backward compatibility)
+
+  @Column({ type: 'int', default: 0 })
+  incorrectAnswerPenalty: number; // Penalty untuk jawaban salah
+
+  @Column({ type: 'int', default: 0 })
+  unansweredPenalty: number; // Penalty untuk tidak menjawab
+
+  @Column({ type: 'int', default: 0 })
+  bonusPoints: number; // Bonus points
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 1.0 })
+  multiplier: number; // Score multiplier
+
+  @Column({ type: 'boolean', default: false })
+  timeBonusEnabled: boolean; // Enable time bonus
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0.0 })
+  timeBonusPerSecond: number; // Bonus per detik
+
+  @Column({ type: 'int', nullable: true })
+  maxScore: number; // Maksimum nilai (optional, untuk range scoring)
+
+  @Column({ type: 'int', nullable: true })
+  minScore: number; // Minimum nilai (optional, untuk range scoring)
+
+  @Column({ type: 'int', nullable: true })
+  passingScore: number; // Passing score (optional)
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;

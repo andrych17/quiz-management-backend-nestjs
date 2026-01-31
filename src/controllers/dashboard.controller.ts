@@ -30,7 +30,7 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Get dashboard statistics (Admin only)',
     description:
-      'Get comprehensive dashboard statistics including active quizzes, admin users, today\'s activities, and participant counts',
+      "Get comprehensive dashboard statistics including active quizzes, admin users, today's activities, and participant counts",
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -76,7 +76,8 @@ export class DashboardController {
   @Get('recent-activity')
   @ApiOperation({
     summary: 'Get recent activity (Admin only)',
-    description: 'Get list of recent quiz attempts with participant and quiz details',
+    description:
+      'Get list of recent quiz attempts with participant and quiz details',
   })
   @ApiQuery({
     name: 'limit',
@@ -111,7 +112,12 @@ export class DashboardController {
   async getRecentActivity(
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
-    DebugLogger.endpoint('GET', '/api/dashboard/recent-activity', {}, { limit: limit || 50 });
+    DebugLogger.endpoint(
+      'GET',
+      '/api/dashboard/recent-activity',
+      {},
+      { limit: limit || 50 },
+    );
     return await this.dashboardService.getRecentActivity(limit || 50);
   }
 }

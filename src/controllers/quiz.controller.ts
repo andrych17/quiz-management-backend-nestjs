@@ -119,12 +119,6 @@ export class QuizController {
     description: 'Template quiz berhasil diambil',
     type: [QuizResponseDto],
   })
-
-
-
-
-
-
   @Get('mapping-guide')
   @ApiOperation({
     summary: 'Get comprehensive guide for quiz filtering and mappings',
@@ -222,12 +216,6 @@ export class QuizController {
     );
   }
 
-
-
-
-
-
-
   @Post(':id/generate-link')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
@@ -286,9 +274,10 @@ export class QuizController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Publish quiz',
-    description: 'Publish quiz dan generate URL jika belum ada. Quiz yang dipublish bisa diakses secara publik. Quiz harus memiliki minimal 1 soal dan 1 template penilaian.' 
+    description:
+      'Publish quiz dan generate URL jika belum ada. Quiz yang dipublish bisa diakses secara publik. Quiz harus memiliki minimal 1 soal dan 1 template penilaian.',
   })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
@@ -298,9 +287,12 @@ export class QuizController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Quiz tidak dapat dipublish karena belum memiliki soal atau template penilaian',
+    description:
+      'Quiz tidak dapat dipublish karena belum memiliki soal atau template penilaian',
   })
-  async publish(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<QuizResponseDto>> {
+  async publish(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StdApiResponse<QuizResponseDto>> {
     const result = await this.quizService.publish(id);
     return ResponseFactory.success(result, 'Quiz published successfully');
   }
@@ -309,9 +301,9 @@ export class QuizController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Unpublish quiz',
-    description: 'Unpublish quiz sehingga tidak bisa diakses secara publik.' 
+    description: 'Unpublish quiz sehingga tidak bisa diakses secara publik.',
   })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
@@ -319,7 +311,9 @@ export class QuizController {
     description: 'Quiz unpublished successfully',
     type: QuizResponseDto,
   })
-  async unpublish(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<QuizResponseDto>> {
+  async unpublish(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StdApiResponse<QuizResponseDto>> {
     const result = await this.quizService.unpublish(id);
     return ResponseFactory.success(result, 'Quiz unpublished successfully');
   }

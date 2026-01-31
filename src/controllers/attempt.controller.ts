@@ -33,14 +33,26 @@ export class AttemptController {
   constructor(private readonly attemptService: AttemptService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get all attempts with pagination and filters (Admin only)' })
+  @ApiOperation({
+    summary: 'Get all attempts with pagination and filters (Admin only)',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by participant name, email, or NIJ' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by participant name, email, or NIJ',
+  })
   @ApiQuery({ name: 'serviceKey', required: false, type: String })
   @ApiQuery({ name: 'locationKey', required: false, type: String })
   @ApiQuery({ name: 'quizId', required: false, type: Number })
-  @ApiQuery({ name: 'quizName', required: false, type: String, description: 'Filter by quiz title/name' })
+  @ApiQuery({
+    name: 'quizName',
+    required: false,
+    type: String,
+    description: 'Filter by quiz title/name',
+  })
   @ApiQuery({ name: 'startDate', required: false, type: String })
   @ApiQuery({ name: 'endDate', required: false, type: String })
   @ApiResponse({
@@ -59,17 +71,22 @@ export class AttemptController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    DebugLogger.endpoint('GET', '/api/attempts', {}, {
-      page,
-      limit,
-      search,
-      serviceKey,
-      locationKey,
-      quizId,
-      quizName,
-      startDate,
-      endDate,
-    });
+    DebugLogger.endpoint(
+      'GET',
+      '/api/attempts',
+      {},
+      {
+        page,
+        limit,
+        search,
+        serviceKey,
+        locationKey,
+        quizId,
+        quizName,
+        startDate,
+        endDate,
+      },
+    );
     return this.attemptService.findAllWithFilter(
       page,
       limit,
@@ -84,15 +101,15 @@ export class AttemptController {
   }
 
   @Get(':id/view')
-  @ApiOperation({ summary: 'Get attempt with detailed answers for review (Admin only)' })
+  @ApiOperation({
+    summary: 'Get attempt with detailed answers for review (Admin only)',
+  })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Attempt with answers retrieved successfully',
   })
-  async viewAttempt(
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async viewAttempt(@Param('id', ParseIntPipe) id: number) {
     return this.attemptService.getAttemptWithAnswers(id);
   }
 
@@ -109,9 +126,24 @@ export class AttemptController {
 
   @Get('export-excel')
   @ApiOperation({ summary: 'Export quiz attempts to Excel (Admin only)' })
-  @ApiQuery({ name: 'quizId', required: false, type: Number, description: 'Filter by quiz ID' })
-  @ApiQuery({ name: 'serviceKey', required: false, type: String, description: 'Filter by service' })
-  @ApiQuery({ name: 'locationKey', required: false, type: String, description: 'Filter by location' })
+  @ApiQuery({
+    name: 'quizId',
+    required: false,
+    type: Number,
+    description: 'Filter by quiz ID',
+  })
+  @ApiQuery({
+    name: 'serviceKey',
+    required: false,
+    type: String,
+    description: 'Filter by service',
+  })
+  @ApiQuery({
+    name: 'locationKey',
+    required: false,
+    type: String,
+    description: 'Filter by location',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Quiz attempts exported to Excel successfully',
@@ -122,11 +154,16 @@ export class AttemptController {
     @Query('locationKey') locationKey?: string,
     @Res() res?: Response,
   ) {
-    DebugLogger.endpoint('GET', '/api/attempts/export-excel', {}, {
-      quizId,
-      serviceKey,
-      locationKey,
-    });
+    DebugLogger.endpoint(
+      'GET',
+      '/api/attempts/export-excel',
+      {},
+      {
+        quizId,
+        serviceKey,
+        locationKey,
+      },
+    );
 
     const buffer = await this.attemptService.exportAttemptsToExcel(
       quizId,

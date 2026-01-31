@@ -24,6 +24,8 @@ import { UrlGeneratorService } from './url-generator.service';
 import { AutoAssignmentService } from './auto-assignment.service';
 import { ConfigService } from './config.service';
 import { FileUploadService } from './file-upload.service';
+import { R2StorageService } from './r2-storage.service';
+import { DebugLogger } from '../lib/debug-logger';
 
 interface UserInfo {
   id?: number;
@@ -51,7 +53,8 @@ export class QuizService {
     private readonly autoAssignmentService: AutoAssignmentService,
     private readonly configService: ConfigService,
     private readonly fileUploadService: FileUploadService,
-  ) { }
+    private readonly r2StorageService: R2StorageService,
+  ) {}
 
   // Helper method to get full image URL from file server
   private getFullImageUrl(filePath: string): string {
@@ -129,7 +132,7 @@ export class QuizService {
         const totalQuestions = createQuizDto.questions?.length || 0;
         if (totalQuestions > 0) {
           const correctAnswersSet = new Set(
-            createQuizDto.scoringTemplates.map(t => t.correctAnswers)
+            createQuizDto.scoringTemplates.map((t) => t.correctAnswers),
           );
 
           // Check apakah ada yang terlewat
@@ -143,7 +146,7 @@ export class QuizService {
           if (missing.length > 0) {
             throw new BadRequestException(
               `Template penilaian tidak lengkap. Belum ada template untuk: ${missing.join(', ')} jawaban benar. ` +
-              `Quiz memiliki ${totalQuestions} soal, harus ada template untuk 0 sampai ${totalQuestions} jawaban benar.`
+                `Quiz memiliki ${totalQuestions} soal, harus ada template untuk 0 sampai ${totalQuestions} jawaban benar.`,
             );
           }
         }
@@ -165,23 +168,26 @@ export class QuizService {
       }
 
       // Handle questions creation
-      let savedQuestions = [];
+      const savedQuestions = [];
       if (createQuizDto.questions && createQuizDto.questions.length > 0) {
-        console.log('Creating questions:', createQuizDto.questions.map((q, index) => ({
-          index,
-          questionText: q.questionText,
-          correctAnswer: q.correctAnswer,
-          correctAnswerLength: q.correctAnswer ? q.correctAnswer.length : 'undefined',
-          questionType: q.questionType
-        })));
+        DebugLogger.debug(
+          'QuizService',
+          `Creating ${createQuizDto.questions.length} questions for quiz`,
+        );
 
         for (let i = 0; i < createQuizDto.questions.length; i++) {
           const questionData = createQuizDto.questions[i];
 
           // Text questions don't need correct answers (open-ended)
           const isOpenEnded = questionData.questionType === 'text';
-          if (!isOpenEnded && (!questionData.correctAnswer || questionData.correctAnswer.trim() === '')) {
-            throw new BadRequestException(`Question ${i + 1}: correctAnswer is required and cannot be empty`);
+          if (
+            !isOpenEnded &&
+            (!questionData.correctAnswer ||
+              questionData.correctAnswer.trim() === '')
+          ) {
+            throw new BadRequestException(
+              `Question ${i + 1}: correctAnswer is required and cannot be empty`,
+            );
           }
 
           // Convert questionType to match enum values
@@ -195,15 +201,15 @@ export class QuizService {
             questionText: questionData.questionText,
             questionType: questionType as any,
             options: questionData.options || [],
-            correctAnswer: questionData.correctAnswer ? questionData.correctAnswer.trim() : '',
+            correctAnswer: questionData.correctAnswer
+              ? questionData.correctAnswer.trim()
+              : '',
             order: questionData.order ?? i + 1, // Auto-generate order if not provided
           });
 
           const savedQuestion = await this.questionRepository.save(question);
-          console.log(`Saved question ${i + 1}:`, {
+          DebugLogger.debug('QuizService', `Saved question ${i + 1}`, {
             id: savedQuestion.id,
-            correctAnswer: savedQuestion.correctAnswer,
-            questionText: savedQuestion.questionText.substring(0, 50) + '...'
           });
 
           savedQuestions.push(savedQuestion);
@@ -238,7 +244,7 @@ export class QuizService {
         },
       };
     } catch (error) {
-      console.error('Quiz creation error:', error);
+      DebugLogger.error('QuizService', 'Quiz creation error', error.message);
       return {
         success: false,
         message: ERROR_MESSAGES.DATABASE_ERROR,
@@ -567,19 +573,62 @@ export class QuizService {
       if (quiz.attempts && quiz.attempts.length > 0) {
         throw new BadRequestException(
           'Tidak dapat mengubah soal untuk quiz yang sudah dikerjakan oleh peserta. ' +
-          'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
+            'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
         );
       }
 
-      // Delete existing questions (cascade will delete related data)
-      if (quiz.questions && quiz.questions.length > 0) {
-        await this.questionRepository.delete({ quizId: id });
+      // Smart update: Match by ID (if provided), update existing, create new, delete removed
+      const existingQuestions = quiz.questions || [];
+      const incomingIds = questions.filter((q) => q.id).map((q) => q.id);
+      const existingIdsMap = new Map(existingQuestions.map((q) => [q.id, q]));
+
+      // 1. Delete questions that are no longer in the incoming data (only if they have ID)
+      for (const existingQuestion of existingQuestions) {
+        // Only delete if incoming data has IDs and this question's ID is not included
+        if (
+          incomingIds.length > 0 &&
+          !incomingIds.includes(existingQuestion.id)
+        ) {
+          // Delete images from R2 first
+          const images = await this.quizImageRepository.find({
+            where: { questionId: existingQuestion.id },
+          });
+
+          for (const image of images) {
+            try {
+              await this.r2StorageService.deleteFile(image.fileName);
+              DebugLogger.debug(
+                'QuizService',
+                `Deleted image from R2: ${image.fileName}`,
+              );
+            } catch (error) {
+              DebugLogger.error(
+                'QuizService',
+                `Failed to delete image ${image.fileName}`,
+                error.message,
+              );
+            }
+          }
+
+          await this.quizImageRepository.delete({
+            questionId: existingQuestion.id,
+          });
+          await this.questionRepository.delete({ id: existingQuestion.id });
+          DebugLogger.debug(
+            'QuizService',
+            `Deleted question ID ${existingQuestion.id}`,
+          );
+        }
       }
 
-      // Create new questions
+      // 2. Update existing or create new questions
       if (questions.length > 0) {
         for (let i = 0; i < questions.length; i++) {
           const questionData = questions[i];
+          // Match by ID if provided, otherwise it's a new question
+          const existingQuestion = questionData.id
+            ? existingIdsMap.get(questionData.id)
+            : null;
 
           // Handle correctAnswer properly - now using correctAnswer (singular)
           let correctAnswer = '';
@@ -588,10 +637,13 @@ export class QuizService {
           }
 
           // Text questions don't need correct answers (check both questionType and correctAnswer content)
-          const isTextQuestion = questionData.questionType === 'text' || correctAnswer === 'text';
+          const isTextQuestion =
+            questionData.questionType === 'text' || correctAnswer === 'text';
 
           if (!isTextQuestion && !correctAnswer) {
-            throw new BadRequestException(`Question ${i + 1}: correctAnswer is required and cannot be empty`);
+            throw new BadRequestException(
+              `Question ${i + 1}: correctAnswer is required and cannot be empty`,
+            );
           }
 
           // For text questions, clear the correctAnswer
@@ -605,48 +657,175 @@ export class QuizService {
             questionType = questionType.replace('_', '-'); // Convert multiple_choice to multiple-choice
           }
 
-          const question = this.questionRepository.create({
-            quizId: id,
-            questionText: questionData.questionText,
-            questionType: questionType as any,
-            options: questionData.options || [],
-            correctAnswer: correctAnswer,
-            order: questionData.order || i + 1,
-          });
+          let savedQuestion;
 
-          const savedQuestion = await this.questionRepository.save(question);
-          console.log(`Updated question ${i + 1}:`, {
-            id: savedQuestion.id,
-            correctAnswer: savedQuestion.correctAnswer,
-            questionText: savedQuestion.questionText.substring(0, 50) + '...'
+          if (existingQuestion) {
+            // UPDATE existing question
+            existingQuestion.questionText = questionData.questionText;
+            existingQuestion.questionType = questionType as any;
+            existingQuestion.options = questionData.options || [];
+            existingQuestion.correctAnswer = correctAnswer;
+            existingQuestion.order = questionData.order || i + 1;
+
+            savedQuestion =
+              await this.questionRepository.save(existingQuestion);
+            DebugLogger.debug(
+              'QuizService',
+              `Updated question ${i + 1} (ID: ${savedQuestion.id})`,
+            );
+          } else {
+            // CREATE new question
+            const question = this.questionRepository.create({
+              quizId: id,
+              questionText: questionData.questionText,
+              questionType: questionType as any,
+              options: questionData.options || [],
+              correctAnswer: correctAnswer,
+              order: questionData.order || i + 1,
+            });
+
+            savedQuestion = await this.questionRepository.save(question);
+            DebugLogger.debug(
+              'QuizService',
+              `Created new question ${i + 1} (ID: ${savedQuestion.id})`,
+            );
+          }
+
+          // Handle images update: match by sequence for images (within this question)
+          const existingImages = await this.quizImageRepository.find({
+            where: { questionId: savedQuestion.id },
+            order: { sequence: 'ASC' },
           });
+          const existingImagesMap = new Map(
+            existingImages.map((img) => [img.sequence, img]),
+          );
 
           // Handle multiple images upload (new multi-image support)
-          if (questionData.imagesBase64 && questionData.imagesBase64.length > 0) {
+          if (
+            questionData.imagesBase64 &&
+            questionData.imagesBase64.length > 0
+          ) {
             try {
-              for (let imgIdx = 0; imgIdx < questionData.imagesBase64.length; imgIdx++) {
+              // CHANGED: Only add/update images in incoming data, do NOT delete existing images
+              // This allows incremental image uploads (e.g., upload image 3 without sending images 1 & 2)
+
+              // Update or create images
+              for (
+                let imgIdx = 0;
+                imgIdx < questionData.imagesBase64.length;
+                imgIdx++
+              ) {
                 const imgData = questionData.imagesBase64[imgIdx];
-                const fileInfo = await this.fileUploadService.uploadFromBase64(
-                  imgData.imageBase64,
-                  imgData.originalName || `question_image_${imgIdx + 1}.jpg`,
-                  `question/${savedQuestion.id}`,
-                );
+                const imgSequence = imgData.sequence || imgIdx + 1;
+                const existingImage = existingImagesMap.get(imgSequence);
 
-                const imageRecord = this.quizImageRepository.create({
-                  questionId: savedQuestion.id,
-                  fileName: fileInfo.fileName,
-                  originalName: fileInfo.originalName,
-                  mimeType: fileInfo.mimeType,
-                  fileSize: fileInfo.fileSize,
-                  altText: imgData.altText,
-                  isActive: true,
-                });
+                // Check if this is new base64 data or existing image reference
+                const isBase64 =
+                  imgData.imageBase64 &&
+                  imgData.imageBase64.startsWith('data:');
 
-                await this.quizImageRepository.save(imageRecord);
+                if (isBase64) {
+                  // Delete old image file from R2 if updating
+                  if (existingImage) {
+                    try {
+                      await this.r2StorageService.deleteFile(
+                        existingImage.fileName,
+                      );
+                      DebugLogger.debug(
+                        'QuizService',
+                        `Deleted old image for update: ${existingImage.fileName}`,
+                      );
+                    } catch (error) {
+                      DebugLogger.error(
+                        'QuizService',
+                        'Failed to delete old image',
+                        error.message,
+                      );
+                    }
+                  }
+
+                  // Upload new image to storage
+                  const fileInfo =
+                    await this.fileUploadService.uploadFromBase64(
+                      imgData.imageBase64,
+                      imgData.originalName ||
+                        `question_image_${imgSequence}.jpg`,
+                      `question/${savedQuestion.id}`,
+                    );
+
+                  if (existingImage) {
+                    // UPDATE existing image record
+                    existingImage.fileName = fileInfo.fileName;
+                    existingImage.originalName = fileInfo.originalName;
+                    existingImage.mimeType = fileInfo.mimeType;
+                    existingImage.fileSize = fileInfo.fileSize;
+                    existingImage.altText = imgData.altText;
+                    existingImage.sequence = imgSequence;
+
+                    await this.quizImageRepository.save(existingImage);
+                    DebugLogger.debug(
+                      'QuizService',
+                      `Updated image seq ${imgSequence} for question ${i + 1}`,
+                    );
+                  } else {
+                    // CREATE new image record
+                    const imageRecord = this.quizImageRepository.create({
+                      questionId: savedQuestion.id,
+                      sequence: imgSequence,
+                      fileName: fileInfo.fileName,
+                      originalName: fileInfo.originalName,
+                      mimeType: fileInfo.mimeType,
+                      fileSize: fileInfo.fileSize,
+                      altText: imgData.altText,
+                      isActive: true,
+                    });
+
+                    await this.quizImageRepository.save(imageRecord);
+                    DebugLogger.debug(
+                      'QuizService',
+                      `Created new image seq ${imgSequence} for question ${i + 1}`,
+                    );
+                  }
+                } else if (existingImage) {
+                  // Keep existing image, just update metadata if needed
+                  if (imgData.altText !== undefined) {
+                    existingImage.altText = imgData.altText;
+                    await this.quizImageRepository.save(existingImage);
+                    DebugLogger.debug(
+                      'QuizService',
+                      `Updated metadata for image seq ${imgSequence}`,
+                    );
+                  }
+                } else if (imgData.fileName) {
+                  // Reference to existing image from another question - create new record
+                  const imageRecord = this.quizImageRepository.create({
+                    questionId: savedQuestion.id,
+                    sequence: imgSequence,
+                    fileName: imgData.fileName,
+                    originalName: imgData.originalName || 'existing_image.jpg',
+                    mimeType: imgData.mimeType || 'image/jpeg',
+                    fileSize: imgData.fileSize || 0,
+                    altText: imgData.altText,
+                    isActive: true,
+                  });
+
+                  await this.quizImageRepository.save(imageRecord);
+                  DebugLogger.debug(
+                    'QuizService',
+                    `Reused existing image for question ${i + 1}`,
+                  );
+                }
               }
-              console.log(`Saved ${questionData.imagesBase64.length} images for question ${i + 1}`);
+              DebugLogger.debug(
+                'QuizService',
+                `Processed ${questionData.imagesBase64.length} images for question ${i + 1}`,
+              );
             } catch (uploadError) {
-              console.error(`Failed to upload images for question ${i + 1}:`, uploadError.message);
+              DebugLogger.error(
+                'QuizService',
+                `Failed to upload images for question ${i + 1}`,
+                uploadError.message,
+              );
               throw new BadRequestException(
                 `Question ${i + 1}: Gagal upload gambar - ${uploadError.message}`,
               );
@@ -655,28 +834,103 @@ export class QuizService {
           // Fallback to single image upload (backward compatibility)
           else if (questionData.imageBase64) {
             try {
-              const fileInfo = await this.fileUploadService.uploadFromBase64(
-                questionData.imageBase64,
-                questionData.imageOriginalName || 'question_image.jpg',
-                `question/${savedQuestion.id}`,
-              );
+              const imgSequence = questionData.imageSequence || 1;
+              const existingImage = existingImagesMap.get(imgSequence);
 
-              const imageRecord = this.quizImageRepository.create({
-                questionId: savedQuestion.id,
-                fileName: fileInfo.fileName,
-                originalName: fileInfo.originalName,
-                mimeType: fileInfo.mimeType,
-                fileSize: fileInfo.fileSize,
-                altText: questionData.imageAltText,
-                isActive: true,
-              });
+              // Check if this is new base64 data or existing image reference
+              const isBase64 = questionData.imageBase64.startsWith('data:');
 
-              await this.quizImageRepository.save(imageRecord);
-              console.log(`Saved image for question ${i + 1}:`, {
-                fileName: fileInfo.fileName,
-              });
+              if (isBase64) {
+                // Delete old image file from R2 if updating
+                if (existingImage) {
+                  try {
+                    await this.r2StorageService.deleteFile(
+                      existingImage.fileName,
+                    );
+                    DebugLogger.debug(
+                      'QuizService',
+                      `Deleted old single image: ${existingImage.fileName}`,
+                    );
+                  } catch (error) {
+                    DebugLogger.error(
+                      'QuizService',
+                      'Failed to delete old image',
+                      error.message,
+                    );
+                  }
+                }
+
+                // Upload new image to storage
+                const fileInfo = await this.fileUploadService.uploadFromBase64(
+                  questionData.imageBase64,
+                  questionData.imageOriginalName || 'question_image.jpg',
+                  `question/${savedQuestion.id}`,
+                );
+
+                if (existingImage) {
+                  // UPDATE existing image record
+                  existingImage.fileName = fileInfo.fileName;
+                  existingImage.originalName = fileInfo.originalName;
+                  existingImage.mimeType = fileInfo.mimeType;
+                  existingImage.fileSize = fileInfo.fileSize;
+                  existingImage.altText = questionData.imageAltText;
+
+                  await this.quizImageRepository.save(existingImage);
+                  DebugLogger.debug(
+                    'QuizService',
+                    `Updated single image for question ${i + 1}`,
+                  );
+                } else {
+                  // CREATE new image record
+                  const imageRecord = this.quizImageRepository.create({
+                    questionId: savedQuestion.id,
+                    sequence: imgSequence,
+                    fileName: fileInfo.fileName,
+                    originalName: fileInfo.originalName,
+                    mimeType: fileInfo.mimeType,
+                    fileSize: fileInfo.fileSize,
+                    altText: questionData.imageAltText,
+                    isActive: true,
+                  });
+
+                  await this.quizImageRepository.save(imageRecord);
+                  DebugLogger.debug(
+                    'QuizService',
+                    `Created single image for question ${i + 1}`,
+                  );
+                }
+              } else if (existingImage) {
+                // Keep existing image, update metadata
+                if (questionData.imageAltText !== undefined) {
+                  existingImage.altText = questionData.imageAltText;
+                  await this.quizImageRepository.save(existingImage);
+                }
+              } else if (questionData.imageFileName) {
+                // Reference to existing image - create new record
+                const imageRecord = this.quizImageRepository.create({
+                  questionId: savedQuestion.id,
+                  sequence: imgSequence,
+                  fileName: questionData.imageFileName,
+                  originalName:
+                    questionData.imageOriginalName || 'existing_image.jpg',
+                  mimeType: questionData.imageMimeType || 'image/jpeg',
+                  fileSize: questionData.imageFileSize || 0,
+                  altText: questionData.imageAltText,
+                  isActive: true,
+                });
+
+                await this.quizImageRepository.save(imageRecord);
+                DebugLogger.debug(
+                  'QuizService',
+                  `Reused existing single image for question ${i + 1}`,
+                );
+              }
             } catch (uploadError) {
-              console.error(`Failed to upload image for question ${i + 1}:`, uploadError.message);
+              DebugLogger.error(
+                'QuizService',
+                `Failed to upload image for question ${i + 1}`,
+                uploadError.message,
+              );
               throw new BadRequestException(
                 `Question ${i + 1}: Gagal upload gambar - ${uploadError.message}`,
               );
@@ -692,7 +946,7 @@ export class QuizService {
       if (quiz.attempts && quiz.attempts.length > 0) {
         throw new BadRequestException(
           'Tidak dapat mengubah template penilaian untuk quiz yang sudah dikerjakan oleh peserta. ' +
-          'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
+            'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
         );
       }
 
@@ -701,7 +955,7 @@ export class QuizService {
         const totalQuestions = quiz.questions?.length || 0;
         if (totalQuestions > 0) {
           const correctAnswersSet = new Set(
-            scoringTemplates.map(t => t.correctAnswers)
+            scoringTemplates.map((t) => t.correctAnswers),
           );
 
           // Check apakah ada yang terlewat
@@ -715,7 +969,7 @@ export class QuizService {
           if (missing.length > 0) {
             throw new BadRequestException(
               `Template penilaian tidak lengkap. Belum ada template untuk: ${missing.join(', ')} jawaban benar. ` +
-              `Quiz memiliki ${totalQuestions} soal, harus ada template untuk 0 sampai ${totalQuestions} jawaban benar.`
+                `Quiz memiliki ${totalQuestions} soal, harus ada template untuk 0 sampai ${totalQuestions} jawaban benar.`,
             );
           }
         }
@@ -749,7 +1003,7 @@ export class QuizService {
   async publish(id: number): Promise<QuizDetailResponseDto> {
     const quiz = await this.quizRepository.findOne({
       where: { id },
-      relations: ['questions', 'scoringTemplates']
+      relations: ['questions', 'scoringTemplates'],
     });
 
     if (!quiz) {
@@ -758,18 +1012,22 @@ export class QuizService {
 
     // Validation: Quiz must have at least one question
     if (!quiz.questions || quiz.questions.length === 0) {
-      throw new BadRequestException('Quiz tidak dapat dipublish karena belum memiliki soal. Silakan tambahkan minimal satu soal terlebih dahulu.');
+      throw new BadRequestException(
+        'Quiz tidak dapat dipublish karena belum memiliki soal. Silakan tambahkan minimal satu soal terlebih dahulu.',
+      );
     }
 
     // Validation: Quiz must have at least one scoring template
     if (!quiz.scoringTemplates || quiz.scoringTemplates.length === 0) {
-      throw new BadRequestException('Quiz tidak dapat dipublish karena belum memiliki template penilaian. Silakan tambahkan template penilaian terlebih dahulu.');
+      throw new BadRequestException(
+        'Quiz tidak dapat dipublish karena belum memiliki template penilaian. Silakan tambahkan template penilaian terlebih dahulu.',
+      );
     }
 
     // Generate URLs when publishing (same as generate link)
-    let updateData: any = {
+    const updateData: any = {
       isPublished: true,
-      isActive: true
+      isActive: true,
     };
 
     // Generate URLs if not already generated
@@ -778,7 +1036,7 @@ export class QuizService {
         const urls = await this.urlGeneratorService.generateQuizUrls(
           quiz.slug,
           quiz.token,
-          quiz.id
+          quiz.id,
         );
 
         updateData.normalUrl = urls.normalUrl;
@@ -797,15 +1055,53 @@ export class QuizService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    await this.quizRepository.update(id, { isPublished: false, isActive: false });
+    await this.quizRepository.update(id, {
+      isPublished: false,
+      isActive: false,
+    });
     return this.findOne(id);
   }
 
   async remove(id: number) {
-    const quiz = await this.quizRepository.findOne({ where: { id } });
+    const quiz = await this.quizRepository.findOne({
+      where: { id },
+      relations: ['questions', 'attempts'],
+    });
 
     if (!quiz) {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
+    }
+
+    // Check if quiz has attempts - cannot delete if quiz has been taken
+    if (quiz.attempts && quiz.attempts.length > 0) {
+      throw new BadRequestException(
+        `Quiz tidak dapat dihapus karena sudah ada ${quiz.attempts.length} peserta yang mengerjakan. Anda dapat menonaktifkan quiz dengan unpublish.`,
+      );
+    }
+
+    // Delete all images from storage for all questions in this quiz
+    if (quiz.questions && quiz.questions.length > 0) {
+      for (const question of quiz.questions) {
+        const images = await this.quizImageRepository.find({
+          where: { questionId: question.id },
+        });
+
+        for (const image of images) {
+          try {
+            await this.fileUploadService.deleteImage(image.fileName);
+            DebugLogger.debug(
+              'QuizService',
+              `Deleted image from storage: ${image.fileName}`,
+            );
+          } catch (error) {
+            DebugLogger.error(
+              'QuizService',
+              `Failed to delete image from storage: ${image.fileName}`,
+              error.message,
+            );
+          }
+        }
+      }
     }
 
     await this.quizRepository.remove(quiz);
@@ -834,6 +1130,7 @@ export class QuizService {
             ...question,
             images: images.map((img) => ({
               id: img.id,
+              sequence: img.sequence,
               fileName: img.fileName,
               originalName: img.originalName,
               mimeType: img.mimeType,
@@ -864,10 +1161,6 @@ export class QuizService {
     );
   }
 
-
-
-
-
   async generateLink(
     id: number,
     customAlias?: string,
@@ -878,7 +1171,7 @@ export class QuizService {
   }> {
     const quiz = await this.quizRepository.findOne({
       where: { id },
-      relations: ['attempts']
+      relations: ['attempts'],
     });
 
     if (!quiz) {
@@ -889,17 +1182,17 @@ export class QuizService {
     if (quiz.attempts && quiz.attempts.length > 0) {
       throw new BadRequestException(
         'Tidak dapat membuat ulang link untuk quiz yang sudah dikerjakan oleh peserta. ' +
-        'Hal ini untuk memastikan hasil quiz tetap valid dan menghindari kebingungan peserta.',
+          'Hal ini untuk memastikan hasil quiz tetap valid dan menghindari kebingungan peserta.',
       );
     }
 
     // Always regenerate token for new link (based on datetime)
     const newToken = generateUniqueToken();
 
-    console.log(`=== REGENERATE LINK FOR QUIZ ${id} ===`);
-    console.log('Old token:', quiz.token);
-    console.log('New token:', newToken);
-    console.log('=========================================');
+    DebugLogger.debug('QuizService', `Regenerating link for quiz ${id}`, {
+      oldToken: quiz.token,
+      newToken,
+    });
 
     // Generate URLs with new token
     if (quiz.slug) {
@@ -920,13 +1213,9 @@ export class QuizService {
 
       return urls;
     } else {
-      throw new BadRequestException(
-        'Quiz must have slug to generate link',
-      );
+      throw new BadRequestException('Quiz must have slug to generate link');
     }
   }
-
-
 
   async findByToken(token: string): Promise<Quiz | null> {
     return this.quizRepository.findOne({
@@ -963,12 +1252,12 @@ export class QuizService {
     if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
       // Mode scoring template: Cari berdasarkan correctAnswers
       const matchingTemplate = quiz.scoringTemplates.find(
-        (template) => template.correctAnswers === correctAnswers
+        (template) => template.correctAnswers === correctAnswers,
       );
 
       if (matchingTemplate) {
-        // Score = correctAnswers × points
-        score = correctAnswers * (matchingTemplate.points || 1);
+        // Score langsung dari tabel konversi (IQ scoring: 73, 74, 72, dll)
+        score = matchingTemplate.points;
         gradeDescription = `${correctAnswers} Benar`;
       } else {
         // Jika tidak ada template yang cocok, gunakan default (1 point per jawaban)
@@ -1004,8 +1293,6 @@ export class QuizService {
     };
   }
 
-
-
   async findByTokenPublic(token: string): Promise<QuizResponseDto> {
     const quiz = await this.quizRepository.findOne({
       where: {
@@ -1036,6 +1323,7 @@ export class QuizService {
           ...questionWithoutAnswer,
           images: images.map((img) => ({
             id: img.id,
+            sequence: img.sequence,
             fileName: img.fileName,
             originalName: img.originalName,
             mimeType: img.mimeType,
@@ -1044,7 +1332,7 @@ export class QuizService {
             downloadUrl: `/api/files/${img.fileName}`,
           })),
         };
-      }) || []
+      }) || [],
     );
 
     const transformedQuiz = {

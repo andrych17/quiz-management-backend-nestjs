@@ -1,6 +1,6 @@
 /**
  * Debug Logger Utility
- * 
+ *
  * Provides conditional console logging based on DEBUG_MODE environment variable.
  * When DEBUG_MODE=true, all debug logs will be printed to console.
  * When DEBUG_MODE=false or not set, debug logs are suppressed.

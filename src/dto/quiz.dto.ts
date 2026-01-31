@@ -71,7 +71,8 @@ export class CreateScoringTemplateForQuizDto {
 
   @ApiPropertyOptional({
     example: 1,
-    description: 'Point per jawaban benar (default 1, score = correctAnswers × points)',
+    description:
+      'Point per jawaban benar (default 1, score = correctAnswers × points)',
   })
   @IsOptional()
   @IsNumber()
@@ -94,10 +95,6 @@ export class CreateQuizDto {
   @IsNotEmpty()
   @IsString()
   description: string;
-
-
-
-
 
   @ApiPropertyOptional({
     example: 'jakarta_pusat',
@@ -233,10 +230,6 @@ export class UpdateQuizDto {
   @IsString()
   slug?: string;
 
-
-
-
-
   @ApiPropertyOptional({
     example: 'jakarta_pusat',
     description: 'Location key from config items (location group)',
@@ -278,8 +271,6 @@ export class UpdateQuizDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
-
-
 
   @ApiPropertyOptional({
     example: '2024-01-01T08:00:00.000Z',
@@ -350,6 +341,7 @@ export class UpdateQuizDto {
   })
   @IsOptional()
   questions?: Array<{
+    id?: number; // Question ID for matching on update (if provided, updates existing; if not, creates new)
     questionText: string;
     questionType: string; // Supports: 'multiple-choice', 'multiple-select', 'text', 'true-false'
     imageUrl?: string;
@@ -361,10 +353,18 @@ export class UpdateQuizDto {
     imageBase64?: string;
     imageOriginalName?: string;
     imageAltText?: string;
+    imageSequence?: number;
+    imageFileName?: string; // Reference to existing image
+    imageMimeType?: string;
+    imageFileSize?: number;
     imagesBase64?: Array<{
       imageBase64: string;
       originalName?: string;
       altText?: string;
+      sequence?: number;
+      fileName?: string; // Reference to existing image
+      mimeType?: string;
+      fileSize?: number;
     }>;
   }>;
 }
@@ -435,8 +435,6 @@ export class QuizResponseDto {
 
   @ApiProperty({ example: true, description: 'Whether the quiz is active' })
   isActive: boolean;
-
-
 
   @ApiProperty({
     example: '2024-01-01T08:00:00.000Z',

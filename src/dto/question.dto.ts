@@ -75,7 +75,17 @@ export class CreateQuestionDto {
   imageAltText?: string;
 
   @ApiPropertyOptional({
-    description: 'Array of base64 images for multi-image support (max 5MB each)',
+    example: 1,
+    description:
+      'Image sequence number (default: 1). Use to replace specific image.',
+  })
+  @IsOptional()
+  @IsNumber()
+  imageSequence?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Array of base64 images for multi-image support (max 5MB each)',
     type: 'array',
     items: {
       type: 'object',
@@ -83,6 +93,10 @@ export class CreateQuestionDto {
         imageBase64: { type: 'string', description: 'Base64 encoded image' },
         originalName: { type: 'string', description: 'Original filename' },
         altText: { type: 'string', description: 'Alt text for image' },
+        sequence: {
+          type: 'number',
+          description: 'Image sequence (default: auto-increment)',
+        },
       },
     },
   })
@@ -92,6 +106,7 @@ export class CreateQuestionDto {
     imageBase64: string;
     originalName?: string;
     altText?: string;
+    sequence?: number;
   }>;
 
   @ApiPropertyOptional({
@@ -183,7 +198,17 @@ export class UpdateQuestionDto {
   imageAltText?: string;
 
   @ApiPropertyOptional({
-    description: 'Array of base64 images for multi-image support (max 5MB each). Will replace all existing images.',
+    example: 1,
+    description:
+      'Image sequence number (default: 1). Use to replace specific image.',
+  })
+  @IsOptional()
+  @IsNumber()
+  imageSequence?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Array of base64 images for multi-image support (max 5MB each). Images with same sequence will be replaced.',
     type: 'array',
     items: {
       type: 'object',
@@ -191,6 +216,10 @@ export class UpdateQuestionDto {
         imageBase64: { type: 'string', description: 'Base64 encoded image' },
         originalName: { type: 'string', description: 'Original filename' },
         altText: { type: 'string', description: 'Alt text for image' },
+        sequence: {
+          type: 'number',
+          description: 'Image sequence (default: auto-increment)',
+        },
       },
     },
   })
@@ -200,6 +229,7 @@ export class UpdateQuestionDto {
     imageBase64: string;
     originalName?: string;
     altText?: string;
+    sequence?: number;
   }>;
 
   @ApiPropertyOptional({
@@ -229,6 +259,15 @@ export class UpdateQuestionDto {
     filePath: string;
     altText?: string;
   }>;
+
+  @ApiPropertyOptional({
+    example: [1, 2, 3],
+    description: 'Array of image IDs to delete from this question',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  deleteImageIds?: number[];
 }
 
 export class QuestionResponseDto {

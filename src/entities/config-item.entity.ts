@@ -32,6 +32,9 @@ export class ConfigItem {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ default: true, nullable: true })
+  isDisplayToUser: boolean; // Only used for 'services' group - whether this service is displayed in public quiz form dropdown
+
   @Column({ nullable: true })
   createdBy: string;
 

@@ -13,9 +13,13 @@ const AppDataSource = new DataSource({
   username: process.env.DATABASE_USERNAME,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
-  ssl: process.env.DATABASE_SSL === 'true' ? {
-    rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false'
-  } : false,
+  ssl:
+    process.env.DATABASE_SSL === 'true'
+      ? {
+          rejectUnauthorized:
+            process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
+        }
+      : false,
   entities: ['src/entities/**/*.entity.ts'],
   synchronize: false,
   logging: false,

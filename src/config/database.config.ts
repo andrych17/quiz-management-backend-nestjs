@@ -37,20 +37,30 @@ export const databaseConfig = registerAs(
     ],
     migrations: ['dist/src/migrations/*.js'],
     synchronize: process.env.DATABASE_SYNCHRONIZE === 'true' || false,
-    logging: process.env.NODE_ENV === 'production' ? false : (process.env.DATABASE_LOGGING === 'true' || false),
+    logging:
+      process.env.NODE_ENV === 'production'
+        ? false
+        : process.env.DATABASE_LOGGING === 'true' || false,
     migrationsRun: process.env.DATABASE_MIGRATIONS_RUN === 'true' || false,
     autoLoadEntities: true,
-    ssl: process.env.DATABASE_SSL === 'true' ? {
-      rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false'
-    } : false,
+    ssl:
+      process.env.DATABASE_SSL === 'true'
+        ? {
+            rejectUnauthorized:
+              process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
+          }
+        : false,
     // Optimized connection pooling for low memory environments
-    extra: process.env.NODE_ENV === 'production' ? {
-      max: 3,
-      min: 1,
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 10000,
-      acquireTimeoutMillis: 10000,
-    } : {},
+    extra:
+      process.env.NODE_ENV === 'production'
+        ? {
+            max: 3,
+            min: 1,
+            connectionTimeoutMillis: 10000,
+            idleTimeoutMillis: 10000,
+            acquireTimeoutMillis: 10000,
+          }
+        : {},
   }),
 );
 
@@ -66,9 +76,13 @@ export const dataSourceConfig: DataSourceOptions = {
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
   logging: process.env.DATABASE_LOGGING === 'true' || false,
-  ssl: process.env.DATABASE_SSL === 'true' ? {
-    rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false'
-  } : false,
+  ssl:
+    process.env.DATABASE_SSL === 'true'
+      ? {
+          rejectUnauthorized:
+            process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
+        }
+      : false,
 };
 
 export const dataSource = new DataSource(dataSourceConfig);

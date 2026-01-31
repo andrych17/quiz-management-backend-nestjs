@@ -4,7 +4,7 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToOne,
+  ManyToOne,
   JoinColumn,
   Index,
 } from 'typeorm';
@@ -17,6 +17,9 @@ export class QuizImage {
 
   @Column()
   questionId: number;
+
+  @Column({ default: 1 })
+  sequence: number;
 
   @Column()
   fileName: string;
@@ -49,7 +52,7 @@ export class QuizImage {
   updatedAt: Date;
 
   // Relations
-  @OneToOne('Question', { onDelete: 'CASCADE' })
+  @ManyToOne('Question', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'questionId' })
   question: any;
 }

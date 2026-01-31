@@ -7,9 +7,10 @@ import {
   GetObjectCommand,
   PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
+import { IStorageService } from '../interfaces/storage.interface';
 
 @Injectable()
-export class R2StorageService {
+export class R2StorageService implements IStorageService {
   private readonly logger = new Logger(R2StorageService.name);
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
@@ -24,11 +25,12 @@ export class R2StorageService {
     );
     this.bucketName =
       this.configService.get<string>('R2_BUCKET_NAME') || 'gms-quiz-app';
-    
+
     // Use backend URL instead of public R2 URL (bucket stays private)
-    this.backendUrl = this.configService.get<string>('BACKEND_URL') || 
-                      this.configService.get<string>('APP_URL') || 
-                      'http://localhost:3001';
+    this.backendUrl =
+      this.configService.get<string>('BACKEND_URL') ||
+      this.configService.get<string>('APP_URL') ||
+      'http://localhost:3001';
 
     if (!accountId || !accessKeyId || !secretAccessKey) {
       this.logger.warn(
@@ -57,10 +59,7 @@ export class R2StorageService {
   /**
    * Generate unique object key for file storage
    */
-  private generateObjectKey(
-    fileName: string,
-    prefix: string = 'quiz',
-  ): string {
+  private generateObjectKey(fileName: string, prefix: string = 'quiz'): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
     // Allow forward slashes in prefix (for nested paths like question/5)
@@ -117,7 +116,10 @@ export class R2StorageService {
         fileSize: fileBuffer.length,
       };
     } catch (error) {
-      this.logger.error(`Failed to upload file to R2: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to upload file to R2: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`R2 upload failed: ${error.message}`);
     }
   }
@@ -141,13 +143,10 @@ export class R2StorageService {
       });
 
       const response = await this.s3Client.send(command);
-      
-      // Convert stream to buffer
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of response.Body as any) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
+
+      // Convert stream to buffer using AWS SDK built-in method
+      const byteArray = await response.Body.transformToByteArray();
+      const buffer = Buffer.from(byteArray);
 
       return {
         body: buffer,
@@ -155,7 +154,10 @@ export class R2StorageService {
         contentLength: response.ContentLength || buffer.length,
       };
     } catch (error) {
-      this.logger.error(`Failed to get file from R2: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get file from R2: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`R2 file retrieval failed: ${error.message}`);
     }
   }
@@ -165,7 +167,9 @@ export class R2StorageService {
    */
   async deleteFile(objectKey: string): Promise<void> {
     if (!this.isEnabled) {
-      this.logger.warn(`Skipping delete for ${objectKey} because R2 is disabled.`);
+      this.logger.warn(
+        `Skipping delete for ${objectKey} because R2 is disabled.`,
+      );
       return;
     }
 
@@ -204,12 +208,12 @@ export class R2StorageService {
       if (match && match[1]) {
         return decodeURIComponent(match[1]);
       }
-      
+
       // Fallback: might be just the object key itself
       if (!backendUrl.includes('http')) {
         return backendUrl;
       }
-      
+
       return null;
     } catch (error) {
       this.logger.warn(`Failed to extract object key from URL: ${backendUrl}`);
