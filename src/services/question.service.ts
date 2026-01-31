@@ -16,6 +16,7 @@ import {
 } from '../dto/question.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import { FileUploadService } from './file-upload.service';
+import { DebugLogger } from '../lib/debug-logger';
 
 @Injectable()
 export class QuestionService {
@@ -57,6 +58,7 @@ export class QuestionService {
         imageBase64,
         imageOriginalName,
         imageAltText,
+        imageSequence,
         imagesBase64,
         ...questionData
       } = createQuestionDto;
@@ -69,14 +71,28 @@ export class QuestionService {
         try {
           for (let i = 0; i < imagesBase64.length; i++) {
             const imgData = imagesBase64[i];
+            const sequence = imgData.sequence || i + 1;
+
+            // Check if image with this sequence already exists
+            const existingImage = await this.quizImageRepository.findOne({
+              where: { questionId: savedQuestion.id, sequence },
+            });
+
+            // If exists, delete old image from R2 first
+            if (existingImage) {
+              await this.fileUploadService.deleteImage(existingImage.fileName);
+              await this.quizImageRepository.delete({ id: existingImage.id });
+            }
+
             const fileInfo = await this.fileUploadService.uploadFromBase64(
               imgData.imageBase64,
-              imgData.originalName || `question_image_${i + 1}.jpg`,
+              imgData.originalName || `question_image_${sequence}.jpg`,
               `question/${savedQuestion.id}`,
             );
 
             const imageRecord = this.quizImageRepository.create({
               questionId: savedQuestion.id,
+              sequence: sequence,
               fileName: fileInfo.fileName,
               originalName: fileInfo.originalName,
               mimeType: fileInfo.mimeType,
@@ -98,6 +114,19 @@ export class QuestionService {
       // Fallback to single image upload (backward compatibility)
       else if (imageBase64) {
         try {
+          const sequence = imageSequence || 1;
+
+          // Check if image with this sequence already exists
+          const existingImage = await this.quizImageRepository.findOne({
+            where: { questionId: savedQuestion.id, sequence },
+          });
+
+          // If exists, delete old image from R2 first
+          if (existingImage) {
+            await this.fileUploadService.deleteImage(existingImage.fileName);
+            await this.quizImageRepository.delete({ id: existingImage.id });
+          }
+
           const fileInfo = await this.fileUploadService.uploadFromBase64(
             imageBase64,
             imageOriginalName || 'question_image.jpg',
@@ -106,6 +135,7 @@ export class QuestionService {
 
           const imageRecord = this.quizImageRepository.create({
             questionId: savedQuestion.id,
+            sequence: sequence,
             fileName: fileInfo.fileName,
             originalName: fileInfo.originalName,
             mimeType: fileInfo.mimeType,
@@ -214,40 +244,86 @@ export class QuestionService {
       imageBase64,
       imageOriginalName,
       imageAltText,
+      imageSequence,
       imagesBase64,
+      deleteImageIds,
       ...questionData
     } = updateQuestionDto;
 
     // Update question basic data
     await this.questionRepository.update(id, questionData);
 
+    // Handle image deletions first (before adding new ones)
+    if (deleteImageIds && deleteImageIds.length > 0) {
+      for (const imageId of deleteImageIds) {
+        try {
+          // Find the image
+          const image = await this.quizImageRepository.findOne({
+            where: { id: imageId, questionId: id },
+          });
+
+          if (image) {
+            // Delete from storage
+            try {
+              await this.fileUploadService.deleteImage(image.fileName);
+              DebugLogger.debug(
+                'QuestionService',
+                `Deleted image file: ${image.fileName}`,
+              );
+            } catch (error) {
+              DebugLogger.error(
+                'QuestionService',
+                'Failed to delete image file',
+                error.message,
+              );
+            }
+
+            // Delete from database
+            await this.quizImageRepository.delete({ id: imageId });
+            DebugLogger.debug(
+              'QuestionService',
+              `Deleted image record: ${imageId}`,
+            );
+          }
+        } catch (error) {
+          DebugLogger.error(
+            'QuestionService',
+            `Failed to delete image ${imageId}`,
+            error.message,
+          );
+        }
+      }
+    }
+
     // Handle multiple images upload (new multi-image support)
     if (imagesBase64 && imagesBase64.length > 0) {
       try {
-        // Delete existing images first
-        const existingImages = await this.quizImageRepository.find({
-          where: { questionId: id },
-        });
-
-        // Delete files from storage
-        for (const img of existingImages) {
-          await this.fileUploadService.deleteImage(img.fileName);
-        }
-
-        // Delete from database
-        await this.quizImageRepository.delete({ questionId: id });
-
-        // Upload new images
+        // Handle each image with sequence
         for (let i = 0; i < imagesBase64.length; i++) {
           const imgData = imagesBase64[i];
+          const sequence = imgData.sequence || i + 1;
+
+          // Check if image with this sequence already exists
+          const existingImage = await this.quizImageRepository.findOne({
+            where: { questionId: id, sequence },
+          });
+
+          // If exists, delete old image from R2 first
+          if (existingImage) {
+            await this.fileUploadService.deleteImage(existingImage.fileName);
+            await this.quizImageRepository.delete({ id: existingImage.id });
+          }
+
+          // Upload new image
           const fileInfo = await this.fileUploadService.uploadFromBase64(
             imgData.imageBase64,
-            imgData.originalName || `question_image_${i + 1}.jpg`,
+            imgData.originalName || `question_image_${sequence}.jpg`,
             `question/${id}`,
           );
 
           const imageRecord = this.quizImageRepository.create({
             questionId: id,
+            sequence: sequence,
             fileName: fileInfo.fileName,
             originalName: fileInfo.originalName,
             mimeType: fileInfo.mimeType,
@@ -267,18 +343,18 @@ export class QuestionService {
     // Fallback to single image upload (backward compatibility)
     else if (imageBase64) {
       try {
-        // Delete existing images first
-        const existingImages = await this.quizImageRepository.find({
-          where: { questionId: id },
+        const sequence = imageSequence || 1;
+
+        // Check if image with this sequence already exists
+        const existingImage = await this.quizImageRepository.findOne({
+          where: { questionId: id, sequence },
         });
 
-        // Delete files from storage
-        for (const img of existingImages) {
-          await this.fileUploadService.deleteImage(img.fileName);
+        // If exists, delete old image from R2 first
+        if (existingImage) {
+          await this.fileUploadService.deleteImage(existingImage.fileName);
+          await this.quizImageRepository.delete({ id: existingImage.id });
         }
-
-        // Delete from database
-        await this.quizImageRepository.delete({ questionId: id });
 
         // Upload new image
         const fileInfo = await this.fileUploadService.uploadFromBase64(
@@ -289,6 +365,7 @@ export class QuestionService {
 
         const imageRecord = this.quizImageRepository.create({
           questionId: id,
+          sequence: sequence,
           fileName: fileInfo.fileName,
           originalName: fileInfo.originalName,
           mimeType: fileInfo.mimeType,
@@ -334,6 +411,39 @@ export class QuestionService {
 
     if (!question) {
       throw new NotFoundException(ERROR_MESSAGES.RECORD_NOT_FOUND);
+    }
+
+    // Check if quiz has attempts - cannot delete question if quiz has been taken
+    const quiz = await this.quizRepository.findOne({
+      where: { id: question.quizId },
+      relations: ['attempts'],
+    });
+
+    if (quiz && quiz.attempts && quiz.attempts.length > 0) {
+      throw new BadRequestException(
+        `Pertanyaan tidak dapat dihapus karena quiz sudah dikerjakan oleh ${quiz.attempts.length} peserta.`,
+      );
+    }
+
+    // Delete all images from storage for this question
+    const images = await this.quizImageRepository.find({
+      where: { questionId: id },
+    });
+
+    for (const image of images) {
+      try {
+        await this.fileUploadService.deleteImage(image.fileName);
+        DebugLogger.debug(
+          'QuestionService',
+          `Deleted image: ${image.fileName}`,
+        );
+      } catch (error) {
+        DebugLogger.error(
+          'QuestionService',
+          `Failed to delete image: ${image.fileName}`,
+          error.message,
+        );
+      }
     }
 
     await this.questionRepository.remove(question);
@@ -391,5 +501,48 @@ export class QuestionService {
 
   async getQuestionCount(quizId: number): Promise<number> {
     return this.questionRepository.count({ where: { quizId } });
+  }
+
+  /**
+   * Delete specific image from a question by image ID
+   */
+  async deleteQuestionImage(
+    questionId: number,
+    imageId: number,
+  ): Promise<{ message: string }> {
+    // Verify question exists
+    const question = await this.questionRepository.findOne({
+      where: { id: questionId },
+    });
+
+    if (!question) {
+      throw new NotFoundException('Question not found');
+    }
+
+    // Find the image
+    const image = await this.quizImageRepository.findOne({
+      where: { id: imageId, questionId },
+    });
+
+    if (!image) {
+      throw new NotFoundException('Image not found for this question');
+    }
+
+    // Delete from storage
+    try {
+      await this.fileUploadService.deleteImage(image.fileName);
+      DebugLogger.debug('QuestionService', `Deleted image: ${image.fileName}`);
+    } catch (error) {
+      DebugLogger.error(
+        'QuestionService',
+        'Failed to delete image file',
+        error.message,
+      );
+    }
+
+    // Delete from database
+    await this.quizImageRepository.delete({ id: imageId });
+
+    return { message: SUCCESS_MESSAGES.DELETED('Question image') };
   }
 }

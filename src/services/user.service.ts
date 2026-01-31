@@ -19,6 +19,7 @@ import {
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, DEFAULTS } from '../constants';
 import { AutoAssignmentService } from './auto-assignment.service';
 import { ConfigService } from './config.service';
+import { DebugLogger } from '../lib/debug-logger';
 
 interface UserInfo {
   id?: number;
@@ -133,7 +134,7 @@ export class UserService {
         },
       };
     } catch (error) {
-      console.error('User creation error:', error);
+      DebugLogger.error('UserService', 'User creation error', error.message);
       return {
         success: false,
         message: ERROR_MESSAGES.USER_CREATION_FAILED,

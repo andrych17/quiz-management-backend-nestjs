@@ -54,7 +54,10 @@ export class DashboardService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    DebugLogger.debug('DashboardService', `Fetching attempts from ${today.toISOString()} to ${tomorrow.toISOString()}`);
+    DebugLogger.debug(
+      'DashboardService',
+      `Fetching attempts from ${today.toISOString()} to ${tomorrow.toISOString()}`,
+    );
 
     // Get attempts started today
     const attemptsToday = await this.attemptRepository.find({
@@ -64,7 +67,10 @@ export class DashboardService {
       relations: ['quiz'],
     });
 
-    DebugLogger.debug('DashboardService', `Found ${attemptsToday.length} attempts today`);
+    DebugLogger.debug(
+      'DashboardService',
+      `Found ${attemptsToday.length} attempts today`,
+    );
 
     // Group by quiz and count attempts
     const quizMap = new Map<number, { quiz: Quiz; attemptCount: number }>();
@@ -89,7 +95,11 @@ export class DashboardService {
       attemptCount: item.attemptCount,
     }));
 
-    DebugLogger.debug('DashboardService', `Today's active quizzes: ${result.length}`, result);
+    DebugLogger.debug(
+      'DashboardService',
+      `Today's active quizzes: ${result.length}`,
+      result,
+    );
     return result;
   }
 
@@ -112,7 +122,10 @@ export class DashboardService {
 
     // Get unique emails
     const uniqueEmails = new Set(attemptsToday.map((a) => a.email));
-    DebugLogger.debug('DashboardService', `Today's unique participants: ${uniqueEmails.size}`);
+    DebugLogger.debug(
+      'DashboardService',
+      `Today's unique participants: ${uniqueEmails.size}`,
+    );
     return uniqueEmails.size;
   }
 
@@ -127,7 +140,10 @@ export class DashboardService {
       take: limit,
     });
 
-    DebugLogger.debug('DashboardService', `Found ${recentAttempts.length} recent attempts`);
+    DebugLogger.debug(
+      'DashboardService',
+      `Found ${recentAttempts.length} recent attempts`,
+    );
 
     const result = recentAttempts.map((attempt) => ({
       id: attempt.id,
@@ -151,17 +167,13 @@ export class DashboardService {
    */
   async getDashboardStats() {
     DebugLogger.service('DashboardService', 'getDashboardStats', {});
-    const [
-      activeQuizzes,
-      adminUsers,
-      todayActiveQuizzes,
-      todayParticipants,
-    ] = await Promise.all([
-      this.getActiveQuizzesCount(),
-      this.getAdminUsersCount(),
-      this.getTodayActiveQuizzes(),
-      this.getTodayParticipantsCount(),
-    ]);
+    const [activeQuizzes, adminUsers, todayActiveQuizzes, todayParticipants] =
+      await Promise.all([
+        this.getActiveQuizzesCount(),
+        this.getAdminUsersCount(),
+        this.getTodayActiveQuizzes(),
+        this.getTodayParticipantsCount(),
+      ]);
 
     const stats = {
       activeQuizzes,
@@ -170,7 +182,11 @@ export class DashboardService {
       todayParticipants,
     };
 
-    DebugLogger.success('DashboardService', 'Dashboard stats retrieved successfully', stats);
+    DebugLogger.success(
+      'DashboardService',
+      'Dashboard stats retrieved successfully',
+      stats,
+    );
     return stats;
   }
 }

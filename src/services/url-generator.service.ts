@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DebugLogger } from '../lib/debug-logger';
 
 @Injectable()
 export class UrlGeneratorService {
@@ -11,7 +12,8 @@ export class UrlGeneratorService {
     this.frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     this.tinyUrlApiToken = this.configService.get<string>('TINYURL_API_TOKEN');
-    this.enableTinyUrl = this.configService.get<boolean>('ENABLE_TINYURL') !== false;
+    this.enableTinyUrl =
+      this.configService.get<boolean>('ENABLE_TINYURL') !== false;
   }
 
   /**
@@ -25,16 +27,24 @@ export class UrlGeneratorService {
   /**
    * Generate short URL using TinyURL API
    */
-  async generateShortUrl(normalUrl: string, alias?: string): Promise<string | null> {
+  async generateShortUrl(
+    normalUrl: string,
+    alias?: string,
+  ): Promise<string | null> {
     // Check if TinyURL is enabled
     if (!this.enableTinyUrl) {
-      console.log('TinyURL is disabled in configuration');
+      DebugLogger.debug(
+        'UrlGeneratorService',
+        'TinyURL is disabled in configuration',
+      );
       return null;
     }
-    
+
     if (!this.tinyUrlApiToken) {
-      // Return null if TinyURL token not configured
-      console.warn('TinyURL API token not configured - skipping short URL generation');
+      DebugLogger.warn(
+        'UrlGeneratorService',
+        'TinyURL API token not configured',
+      );
       return null;
     }
 
@@ -58,14 +68,20 @@ export class UrlGeneratorService {
       if (result.data && result.data.tiny_url) {
         return result.data.tiny_url;
       } else {
-        // TinyURL API returned error (could be limit reached, invalid alias, etc.)
-        console.warn('TinyURL API error:', result.errors || result);
-        return null; // Return null instead of normalUrl
+        DebugLogger.warn(
+          'UrlGeneratorService',
+          'TinyURL API error',
+          result.errors || result,
+        );
+        return null;
       }
     } catch (error) {
-      // Network error or other exception
-      console.error('Error generating short URL:', error.message || error);
-      return null; // Return null instead of normalUrl
+      DebugLogger.error(
+        'UrlGeneratorService',
+        'Error generating short URL',
+        error.message,
+      );
+      return null;
     }
   }
 
@@ -83,7 +99,10 @@ export class UrlGeneratorService {
   }> {
     const normalUrl = this.generateNormalUrl(quizSlug, quizToken);
     const generatedAlias = alias || this.generateUrlAlias(quizId, quizToken);
-    const shortUrlResult = await this.generateShortUrl(normalUrl, generatedAlias);
+    const shortUrlResult = await this.generateShortUrl(
+      normalUrl,
+      generatedAlias,
+    );
 
     return {
       normalUrl,

@@ -34,16 +34,14 @@ import { UrlShortenerService } from './services/url-shortener.service';
 import { UserQuizAssignmentService } from './services/user-quiz-assignment.service';
 import { UrlGeneratorService } from './services/url-generator.service';
 import { FileUploadService } from './services/file-upload.service';
-import { R2StorageService } from './services/r2-storage.service';
 import { DashboardService } from './services/dashboard.service';
 
 // Shared Services Module
 import { SharedServicesModule } from './shared/shared-services.module';
+import { StorageModule } from './shared/storage.module';
 
 // Auth Module
 import { AuthModule } from './auth/auth.module';
-
-
 
 import { databaseConfig } from './config/database.config';
 
@@ -69,6 +67,7 @@ import { databaseConfig } from './config/database.config';
       QuizScoring,
     ]),
     SharedServicesModule,
+    StorageModule,
     AuthModule,
   ],
   controllers: [
@@ -91,7 +90,6 @@ import { databaseConfig } from './config/database.config';
     UrlShortenerService,
     UserQuizAssignmentService,
     UrlGeneratorService,
-    R2StorageService,
     FileUploadService,
     DashboardService,
   ],

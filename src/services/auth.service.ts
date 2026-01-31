@@ -16,6 +16,7 @@ import {
 import { CreateUserDto, UserRole } from '../dto/user.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import * as bcrypt from 'bcrypt';
+import { DebugLogger } from '../lib/debug-logger';
 
 @Injectable()
 export class AuthService {
@@ -281,8 +282,11 @@ export class AuthService {
         lastLogin: new Date(),
       } as any);
     } catch (error) {
-      // Log error but don't fail the login process
-      console.error('Failed to update last login:', error);
+      DebugLogger.error(
+        'AuthService',
+        'Failed to update last login',
+        error.message,
+      );
     }
   }
 

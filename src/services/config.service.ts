@@ -16,6 +16,7 @@ import {
   ApiResponse,
   ResponseFactory,
 } from '../interfaces/api-response.interface';
+import { DebugLogger } from '../lib/debug-logger';
 
 interface UserInfo {
   id?: number;
@@ -95,7 +96,11 @@ export class ConfigService {
         data: savedItem,
       };
     } catch (error) {
-      console.error('Config creation error:', error);
+      DebugLogger.error(
+        'ConfigService',
+        'Config creation error',
+        error.message,
+      );
       return {
         success: false,
         message: ERROR_MESSAGES.DATABASE_ERROR,
@@ -267,7 +272,7 @@ export class ConfigService {
         data: updatedItem,
       };
     } catch (error) {
-      console.error('Config update error:', error);
+      DebugLogger.error('ConfigService', 'Config update error', error.message);
       return {
         success: false,
         message: ERROR_MESSAGES.DATABASE_ERROR,
@@ -308,7 +313,11 @@ export class ConfigService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      console.error('Config deletion error:', error);
+      DebugLogger.error(
+        'ConfigService',
+        'Config deletion error',
+        error.message,
+      );
       throw new BadRequestException({
         message: ERROR_MESSAGES.DATABASE_ERROR,
         error: 'DATABASE_ERROR',
@@ -337,6 +346,17 @@ export class ConfigService {
   async getServices(): Promise<ConfigItem[]> {
     return this.configItemRepository.find({
       where: { group: 'services' },
+      order: { order: 'ASC', key: 'ASC' },
+    });
+  }
+
+  async getServicesForPublicUser(): Promise<ConfigItem[]> {
+    return this.configItemRepository.find({
+      where: {
+        group: 'services',
+        isActive: true,
+        isDisplayToUser: true,
+      },
       order: { order: 'ASC', key: 'ASC' },
     });
   }

@@ -1,6 +1,14 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+  Inject,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { R2StorageService } from './r2-storage.service';
+import {
+  IStorageService,
+  STORAGE_SERVICE_TOKEN,
+} from '../interfaces/storage.interface';
 import * as path from 'path';
 
 @Injectable()
@@ -17,7 +25,8 @@ export class FileUploadService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly r2StorageService: R2StorageService,
+    @Inject(STORAGE_SERVICE_TOKEN)
+    private readonly storageService: IStorageService,
   ) {}
 
   /**
@@ -74,8 +83,8 @@ export class FileUploadService {
         `Uploading image: ${originalName} (${mimeType}, ${fileBuffer.length} bytes) with prefix: ${prefix}`,
       );
 
-      // Upload to R2 storage
-      const uploadResult = await this.r2StorageService.uploadFile(
+      // Generate object key and upload to storage backend
+      const uploadResult = await this.storageService.uploadFile(
         fileBuffer,
         originalName,
         mimeType,
@@ -87,7 +96,7 @@ export class FileUploadService {
       );
 
       return {
-        fileName: uploadResult.objectKey, // R2 object key
+        fileName: uploadResult.objectKey, // Storage object key
         fileSize: uploadResult.fileSize,
         mimeType,
         originalName,
@@ -97,33 +106,33 @@ export class FileUploadService {
         `Failed to upload image ${originalName}: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(`Gagal menyimpan file ke cloud storage: ${error.message}`);
+      throw new BadRequestException(
+        `Gagal menyimpan file ke cloud storage: ${error.message}`,
+      );
     }
   }
 
   /**
-   * Delete image file from R2 cloud storage
+   * Delete image file from storage backend
    */
-  async deleteImage(filePath: string): Promise<void> {
+  async deleteImage(fileName: string): Promise<void> {
     try {
-      // Extract object key from URL
-      const objectKey = this.r2StorageService.extractObjectKey(filePath);
-      
-      if (objectKey) {
-        await this.r2StorageService.deleteFile(objectKey);
-      } else {
-        console.warn(`Could not extract object key from URL: ${filePath}`);
-      }
+      // fileName should be the object key itself
+      await this.storageService.deleteFile(fileName);
+      this.logger.log(`File deleted successfully: ${fileName}`);
     } catch (error) {
-      console.error('Failed to delete file from R2:', error);
-      // Don't throw error, just log it
+      this.logger.error(`Failed to delete file from storage: ${error.message}`);
+      // Don't throw error, just log it - deletion failures shouldn't break the application
     }
   }
 
   /**
    * Decode base64 image and infer MIME type from file extension if needed
    */
-  decodeBase64Image(base64String: string, originalName?: string): {
+  decodeBase64Image(
+    base64String: string,
+    originalName?: string,
+  ): {
     buffer: Buffer;
     mimeType: string;
   } {
@@ -139,7 +148,7 @@ export class FileUploadService {
     } else {
       // Plain base64 string - infer MIME type from filename extension if provided
       let mimeType = 'image/jpeg'; // default
-      
+
       if (originalName) {
         const ext = path.extname(originalName).toLowerCase();
         const mimeTypeMap: { [key: string]: string } = {
@@ -151,7 +160,7 @@ export class FileUploadService {
         };
         mimeType = mimeTypeMap[ext] || 'image/jpeg';
       }
-      
+
       return {
         buffer: Buffer.from(base64String, 'base64'),
         mimeType,
@@ -181,21 +190,18 @@ export class FileUploadService {
       );
     }
 
-    const { buffer, mimeType } = this.decodeBase64Image(base64String, originalName);
+    const { buffer, mimeType } = this.decodeBase64Image(
+      base64String,
+      originalName,
+    );
     return this.saveImage(buffer, originalName, mimeType, prefix);
   }
 
   /**
    * Get full URL for file access
-   * Returns backend API URL that serves files from private R2 bucket
+   * Returns backend API URL that serves files from storage
    */
-  getFileUrl(filePath: string): string {
-    // Backend URL is already a complete URL
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-      return filePath;
-    }
-    
-    // Fallback: use R2 service to generate backend URL from object key
-    return this.r2StorageService.getBackendUrl(filePath);
+  getFileUrl(objectKey: string): string {
+    return this.storageService.getBackendUrl(objectKey);
   }
 }

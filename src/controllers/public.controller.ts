@@ -7,14 +7,10 @@ import {
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { AttemptService } from '../services/attempt.service';
+import { ConfigService } from '../services/config.service';
 import { CreateAttemptDto } from '../dto/attempt.dto';
 import { QuizResponseDto } from '../dto/quiz.dto';
 import {
@@ -28,6 +24,7 @@ export class PublicController {
   constructor(
     private readonly quizService: QuizService,
     private readonly attemptService: AttemptService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -45,15 +42,40 @@ export class PublicController {
     return input;
   }
 
+  @Get('services')
+  @ApiOperation({
+    summary: 'Get daftar services/jenis pelayanan untuk public quiz',
+    description:
+      'Endpoint untuk mendapatkan daftar services yang dapat dipilih peserta saat mengerjakan quiz. Hanya menampilkan services dengan isDisplayToUser=true.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Daftar services berhasil diambil',
+  })
+  async getServicesForPublicUser(): Promise<StdApiResponse<any>> {
+    const services = await this.configService.getServicesForPublicUser();
+    const result = services.map((s) => ({
+      key: s.key,
+      value: s.value,
+      description: s.description,
+    }));
+    return ResponseFactory.success(
+      result,
+      'Daftar jenis pelayanan berhasil diambil',
+    );
+  }
+
   @Get('quiz/:token')
   @ApiOperation({
     summary: 'Akses quiz secara publik menggunakan token (tanpa autentikasi)',
-    description: 'Endpoint untuk mengakses quiz yang sudah dipublish menggunakan token. Tidak memerlukan autentikasi.',
+    description:
+      'Endpoint untuk mengakses quiz yang sudah dipublish menggunakan token. Tidak memerlukan autentikasi.',
   })
   @ApiParam({
     name: 'token',
     type: String,
-    description: 'Token quiz untuk akses publik (format: TOKEN atau slug-TOKEN)',
+    description:
+      'Token quiz untuk akses publik (format: TOKEN atau slug-TOKEN)',
     example: 'ABC123DEF456',
   })
   @ApiResponse({
@@ -75,28 +97,33 @@ export class PublicController {
     // Handle both formats: plain token (ABC123) or slug-token (test-ABC123)
     const actualToken = this.extractToken(token);
     const quiz = await this.quizService.findByTokenPublic(actualToken);
-    
+
     // Transform quiz response to include images in questions
     const result = {
       ...quiz,
-      questions: (quiz as any).questions?.map((q: any) => ({
-        id: q.id,
-        questionText: q.questionText,
-        questionType: q.questionType,
-        options: q.options,
-        order: q.order,
-        images: q.images || [], // Include images from question
-        // correctAnswer is already excluded by findByTokenPublic
-      })) || []
+      questions:
+        (quiz as any).questions?.map((q: any) => ({
+          id: q.id,
+          questionText: q.questionText,
+          questionType: q.questionType,
+          options: q.options,
+          order: q.order,
+          images: q.images || [], // Include images from question
+          // correctAnswer is already excluded by findByTokenPublic
+        })) || [],
     };
-    
-    return ResponseFactory.success(result, 'Data quiz dan soal berhasil diambil');
+
+    return ResponseFactory.success(
+      result,
+      'Data quiz dan soal berhasil diambil',
+    );
   }
 
   @Post('quiz/:token/check')
   @ApiOperation({
     summary: 'Cek apakah peserta sudah pernah mengerjakan quiz',
-    description: 'Endpoint untuk mengecek apakah peserta dengan NIJ tertentu sudah pernah submit quiz ini.',
+    description:
+      'Endpoint untuk mengecek apakah peserta dengan NIJ tertentu sudah pernah submit quiz ini.',
   })
   @ApiParam({
     name: 'token',
@@ -114,36 +141,50 @@ export class PublicController {
   ): Promise<StdApiResponse<any>> {
     // Handle both formats: plain token (ABC123) or slug-token (test-ABC123)
     const actualToken = this.extractToken(token);
-    
+
     // Verify quiz exists
     const quiz = await this.quizService.findByTokenPublic(actualToken);
     if (!quiz) {
-      throw new BadRequestException('Quiz tidak ditemukan atau tidak dapat diakses');
+      throw new BadRequestException(
+        'Quiz tidak ditemukan atau tidak dapat diakses',
+      );
     }
 
     // Check if user already submitted using NIJ
-    const existingAttempt = await this.attemptService.findByNijAndQuiz(checkData.nij, quiz.id);
-    
+    const existingAttempt = await this.attemptService.findByNijAndQuiz(
+      checkData.nij,
+      quiz.id,
+    );
+
     const result = {
       hasSubmitted: !!existingAttempt,
       quiz: {
         id: quiz.id,
-        title: quiz.title
+        title: quiz.title,
       },
-      submission: existingAttempt ? {
-        participantName: existingAttempt.participantName,
-        nij: existingAttempt.nij,
-        submittedAt: existingAttempt.submittedAt || existingAttempt.createdAt
-      } : null
+      submission: existingAttempt
+        ? {
+            participantName: existingAttempt.participantName,
+            nij: existingAttempt.nij,
+            submittedAt:
+              existingAttempt.submittedAt || existingAttempt.createdAt,
+          }
+        : null,
     };
 
-    return ResponseFactory.success(result, existingAttempt ? 'Peserta sudah pernah mengerjakan quiz ini' : 'Peserta belum pernah mengerjakan quiz ini');
+    return ResponseFactory.success(
+      result,
+      existingAttempt
+        ? 'Peserta sudah pernah mengerjakan quiz ini'
+        : 'Peserta belum pernah mengerjakan quiz ini',
+    );
   }
 
   @Post('quiz/:token/submit')
   @ApiOperation({
     summary: 'Submit jawaban quiz (tanpa autentikasi)',
-    description: 'Endpoint untuk submit jawaban quiz secara publik. Memerlukan input NIJ, email, nama, dan jawaban.',
+    description:
+      'Endpoint untuk submit jawaban quiz secara publik. Memerlukan input NIJ, email, nama, dan jawaban.',
   })
   @ApiParam({
     name: 'token',
@@ -153,7 +194,8 @@ export class PublicController {
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: 'Jawaban berhasil disubmit (tanpa menampilkan nilai kepada peserta)',
+    description:
+      'Jawaban berhasil disubmit (tanpa menampilkan nilai kepada peserta)',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -161,7 +203,8 @@ export class PublicController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Data tidak valid atau peserta sudah pernah mengerjakan quiz ini',
+    description:
+      'Data tidak valid atau peserta sudah pernah mengerjakan quiz ini',
   })
   async submitQuizAttempt(
     @Param('token') token: string,
@@ -172,7 +215,9 @@ export class PublicController {
     // Verify quiz exists and is accessible
     const quiz = await this.quizService.findByTokenPublic(actualToken);
     if (!quiz) {
-      throw new BadRequestException('Quiz tidak ditemukan atau tidak dapat diakses');
+      throw new BadRequestException(
+        'Quiz tidak ditemukan atau tidak dapat diakses',
+      );
     }
 
     // Set the quiz ID from the token-based quiz
@@ -180,19 +225,24 @@ export class PublicController {
 
     // Create the attempt (but don't return scores/results to participant)
     await this.attemptService.create(submitData);
-    
+
     // Return only confirmation without revealing scores
     const result = {
       submitted: true,
       participantName: submitData.participantName,
       email: submitData.email,
       nij: submitData.nij,
+      servoNumber: submitData.servoNumber || null,
+      serviceKey: submitData.serviceKey,
       submittedAt: new Date().toISOString(),
       quiz: {
-        title: quiz.title
-      }
+        title: quiz.title,
+      },
     };
-    
-    return ResponseFactory.success(result, 'Jawaban Anda berhasil disubmit. Terima kasih telah mengikuti quiz.');
+
+    return ResponseFactory.success(
+      result,
+      'Jawaban Anda berhasil disubmit. Terima kasih telah mengikuti quiz.',
+    );
   }
 }

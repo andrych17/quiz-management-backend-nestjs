@@ -33,6 +33,12 @@ export class Attempt {
   @Column()
   nij: string; // Nomor Induk Jemaat/NIJ
 
+  @Column({ nullable: true })
+  servoNumber: string; // Servo Number peserta saat mengerjakan quiz
+
+  @Column({ nullable: true })
+  serviceKey: string; // Service/jenis pelayanan yang dipilih peserta saat mengerjakan quiz
+
   @Column({ type: 'int', default: 0 })
   score: number; // Nilai akhir (bisa 70, 80, 90 untuk mode IPK, atau 0-100 untuk mode persentase)
 
@@ -63,7 +69,6 @@ export class Attempt {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  // Relations
   @ManyToOne(() => Quiz, (quiz) => quiz.attempts, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'quizId' })
   quiz: Quiz;

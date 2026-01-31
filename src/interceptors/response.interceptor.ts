@@ -51,7 +51,10 @@ export class ResponseInterceptor<T>
         }
 
         // Determine success message based on HTTP method and status
-        const message = this.getDefaultMessage(request.method, response.statusCode);
+        const message = this.getDefaultMessage(
+          request.method,
+          response.statusCode,
+        );
 
         // Handle different response types
         if (data && typeof data === 'object') {

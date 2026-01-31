@@ -118,4 +118,23 @@ export class QuestionController {
   ) {
     return this.questionService.reorderQuestions(quizId, questionIds);
   }
+
+  @Delete(':questionId/images/:imageId')
+  @ApiOperation({ summary: 'Delete specific image from a question' })
+  @ApiParam({ name: 'questionId', type: Number, description: 'Question ID' })
+  @ApiParam({
+    name: 'imageId',
+    type: Number,
+    description: 'Image ID to delete',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Image deleted successfully',
+  })
+  async deleteQuestionImage(
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Param('imageId', ParseIntPipe) imageId: number,
+  ) {
+    return this.questionService.deleteQuestionImage(questionId, imageId);
+  }
 }

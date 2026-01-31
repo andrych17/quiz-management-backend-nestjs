@@ -30,6 +30,22 @@ export class StartQuizAttemptDto {
   @IsNotEmpty()
   @IsString()
   nij: string;
+
+  @ApiPropertyOptional({
+    example: 'SRV001',
+    description: 'Servo Number peserta',
+  })
+  @IsOptional()
+  @IsString()
+  servoNumber?: string;
+
+  @ApiProperty({
+    example: 'art_ministry',
+    description: 'Service key/jenis pelayanan peserta',
+  })
+  @IsNotEmpty()
+  @IsString()
+  serviceKey: string;
 }
 
 export class SubmitAnswerDto {
@@ -64,6 +80,22 @@ export class CreateAttemptDto {
   @IsNotEmpty()
   @IsString()
   nij: string;
+
+  @ApiPropertyOptional({
+    example: 'SRV001',
+    description: 'Servo Number peserta',
+  })
+  @IsOptional()
+  @IsString()
+  servoNumber?: string;
+
+  @ApiProperty({
+    example: 'art_ministry',
+    description: 'Service key/jenis pelayanan peserta',
+  })
+  @IsNotEmpty()
+  @IsString()
+  serviceKey: string;
 
   @ApiProperty({
     type: [SubmitAnswerDto],
@@ -125,6 +157,18 @@ export class AttemptResponseDto {
 
   @ApiProperty({ example: 'NIJ001', description: 'Nomor Induk Jemaat (NIJ)' })
   nij: string;
+
+  @ApiPropertyOptional({
+    example: 'SRV001',
+    description: 'Servo Number peserta',
+  })
+  servoNumber?: string;
+
+  @ApiPropertyOptional({
+    example: 'art_ministry',
+    description: 'Service key/jenis pelayanan peserta',
+  })
+  serviceKey?: string;
 
   @ApiProperty({ example: 85, description: 'Quiz score' })
   score: number;
