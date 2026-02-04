@@ -76,7 +76,33 @@ export class AttemptService {
     });
 
     if (existingAttempt) {
-      throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
+      // Check if attempt is still within the valid time window
+      if (existingAttempt.endDateTime) {
+        const now = new Date();
+        if (now > existingAttempt.endDateTime) {
+          throw new BadRequestException(
+            'Quiz attempt time has expired. Please contact administrator.',
+          );
+        }
+      }
+
+      // If already submitted, don't allow restart
+      if (existingAttempt.submittedAt) {
+        throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
+      }
+
+      // Allow resume - return existing attempt
+      return this.findOne(existingAttempt.id);
+    }
+
+    // Calculate start and end date time
+    const startDateTime = new Date();
+    let endDateTime: Date | null = null;
+
+    if (quiz.durationMinutes) {
+      endDateTime = new Date(
+        startDateTime.getTime() + quiz.durationMinutes * 60000,
+      );
     }
 
     // Create initial attempt (no answers, no score yet)
@@ -88,6 +114,8 @@ export class AttemptService {
       servoNumber: createAttemptDto.servoNumber,
       serviceKey: createAttemptDto.serviceKey,
       startedAt: new Date(),
+      startDateTime: startDateTime,
+      endDateTime: endDateTime,
       // No score, no completion time yet
     });
 
@@ -147,22 +175,52 @@ export class AttemptService {
       },
     });
 
+    let savedAttempt: Attempt;
+
     if (existingAttempt) {
-      throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
+      // Check if attempt time has expired
+      if (existingAttempt.endDateTime) {
+        const now = new Date();
+        if (now > existingAttempt.endDateTime) {
+          throw new BadRequestException(
+            'Quiz attempt time has expired. Submission not allowed.',
+          );
+        }
+      }
+
+      // If already submitted, don't allow resubmission
+      if (existingAttempt.submittedAt) {
+        throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
+      }
+
+      // Use existing attempt for submission
+      savedAttempt = existingAttempt;
+    } else {
+      // Calculate start and end date time for new attempt
+      const startDateTime = new Date();
+      let endDateTime: Date | null = null;
+
+      if (quiz.durationMinutes) {
+        endDateTime = new Date(
+          startDateTime.getTime() + quiz.durationMinutes * 60000,
+        );
+      }
+
+      // Create new attempt
+      const attempt = this.attemptRepository.create({
+        quizId: createAttemptDto.quizId,
+        participantName: createAttemptDto.participantName,
+        email: createAttemptDto.email,
+        nij: createAttemptDto.nij,
+        servoNumber: createAttemptDto.servoNumber,
+        serviceKey: createAttemptDto.serviceKey,
+        startedAt: new Date(),
+        startDateTime: startDateTime,
+        endDateTime: endDateTime,
+      });
+
+      savedAttempt = await this.attemptRepository.save(attempt);
     }
-
-    // Create attempt
-    const attempt = this.attemptRepository.create({
-      quizId: createAttemptDto.quizId,
-      participantName: createAttemptDto.participantName,
-      email: createAttemptDto.email,
-      nij: createAttemptDto.nij,
-      servoNumber: createAttemptDto.servoNumber,
-      serviceKey: createAttemptDto.serviceKey,
-      startedAt: new Date(),
-    });
-
-    const savedAttempt = await this.attemptRepository.save(attempt);
 
     // Process answers and calculate score
     let correctAnswers = 0;

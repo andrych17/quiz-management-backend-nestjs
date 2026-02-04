@@ -11,6 +11,10 @@ import {
   UserQuizAssignment,
   QuizImage,
 } from '../entities';
+import * as dotenv from 'dotenv';
+
+// Load environment variables for CLI migrations
+dotenv.config();
 
 export const databaseConfig = registerAs(
   'database',

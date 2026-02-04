@@ -2,12 +2,14 @@
  * Application Constants
  */
 
-// App URLs
+// App URLs - Derived from APP_URL for simplicity
+const APP_URL = process.env.APP_URL || 'http://localhost:3001';
+
 export const APP_URLS = {
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
-  BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:3001',
-  API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3001/api',
-  FILE_SERVER_URL: process.env.FILE_SERVER_URL || 'http://localhost:8080',
+  BACKEND_URL: process.env.BACKEND_URL || APP_URL,
+  API_BASE_URL: process.env.API_BASE_URL || `${APP_URL}/api`,
+  FILE_SERVER_URL: process.env.FILE_SERVER_URL || APP_URL,
 } as const;
 
 // JWT Configuration

@@ -63,6 +63,12 @@ export class Attempt {
   @Column({ type: 'timestamp', nullable: true })
   submittedAt: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  startDateTime: Date; // Waktu mulai pengerjaan (set saat create attempt)
+
+  @Column({ type: 'timestamp', nullable: true })
+  endDateTime: Date; // Waktu akhir pengerjaan (calculated from startDateTime + duration)
+
   @CreateDateColumn()
   createdAt: Date;
 
