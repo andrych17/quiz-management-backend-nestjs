@@ -8,6 +8,10 @@ import { GlobalExceptionFilter } from './filters/global-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as express from 'express';
+import * as dotenv from 'dotenv';
+
+// Load environment variables at the very start
+dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {

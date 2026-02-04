@@ -3,7 +3,13 @@
     "allow": [
       "Bash(npm run migration:generate:*)",
       "Bash(npm run migration:run:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(npm audit fix:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(npm audit:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

@@ -11,10 +11,6 @@ import {
   UserQuizAssignment,
   QuizImage,
 } from '../entities';
-import * as dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
 
 export const databaseConfig = registerAs(
   'database',
