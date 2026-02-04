@@ -119,6 +119,97 @@ export class PublicController {
     );
   }
 
+  @Post('quiz/:token/resume')
+  @ApiOperation({
+    summary: 'Get attempt data untuk resume quiz (jika ada)',
+    description:
+      'Endpoint untuk mendapatkan data attempt peserta yang sedang berjalan (belum submit). Digunakan saat refresh page untuk restore state.',
+  })
+  @ApiParam({
+    name: 'token',
+    type: String,
+    description: 'Token quiz',
+    example: 'ABC123DEF456',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attempt data berhasil diambil (atau null jika tidak ada)',
+  })
+  async getAttemptForResume(
+    @Param('token') token: string,
+    @Body() data: { email: string; nij: string },
+  ): Promise<StdApiResponse<any>> {
+    // Handle both formats: plain token (ABC123) or slug-token (test-ABC123)
+    const actualToken = this.extractToken(token);
+
+    // Verify quiz exists
+    const quiz = await this.quizService.findByTokenPublic(actualToken);
+    if (!quiz) {
+      throw new BadRequestException(
+        'Quiz tidak ditemukan atau tidak dapat diakses',
+      );
+    }
+
+    // Find existing attempt by email and quizId
+    const existingAttempt = await this.attemptService.findByEmailAndQuiz(
+      data.email,
+      quiz.id,
+    );
+
+    // If no attempt exists, return null
+    if (!existingAttempt) {
+      return ResponseFactory.success(
+        null,
+        'Tidak ada attempt yang ditemukan',
+      );
+    }
+
+    // Check if already submitted - if yes, don't allow resume
+    if (existingAttempt.submittedAt) {
+      return ResponseFactory.success(
+        {
+          alreadySubmitted: true,
+          submittedAt: existingAttempt.submittedAt,
+        },
+        'Quiz sudah di-submit sebelumnya',
+      );
+    }
+
+    // Check if time expired
+    if (existingAttempt.endDateTime) {
+      const now = new Date();
+      if (now > existingAttempt.endDateTime) {
+        return ResponseFactory.success(
+          {
+            timeExpired: true,
+            endDateTime: existingAttempt.endDateTime,
+          },
+          'Waktu pengerjaan quiz telah habis',
+        );
+      }
+    }
+
+    // Return attempt data for resume
+    const result = {
+      attemptId: existingAttempt.id,
+      quizId: existingAttempt.quizId,
+      participantName: existingAttempt.participantName,
+      email: existingAttempt.email,
+      nij: existingAttempt.nij,
+      servoNumber: existingAttempt.servoNumber,
+      serviceKey: existingAttempt.serviceKey,
+      startDateTime: existingAttempt.startDateTime,
+      endDateTime: existingAttempt.endDateTime,
+      startedAt: existingAttempt.startedAt,
+      answers: (existingAttempt as any).answers || [],
+    };
+
+    return ResponseFactory.success(
+      result,
+      'Attempt ditemukan, dapat dilanjutkan',
+    );
+  }
+
   @Post('quiz/:token/check')
   @ApiOperation({
     summary: 'Cek apakah peserta sudah pernah mengerjakan quiz',
