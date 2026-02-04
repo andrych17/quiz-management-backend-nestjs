@@ -18,6 +18,7 @@ import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import { ConfigService } from './config.service';
 import * as ExcelJS from 'exceljs';
 import { DebugLogger } from '../lib/debug-logger';
+import { toWIB, getAttemptStatus, getStatusLabel } from '../utils/datetime.util';
 
 @Injectable()
 export class AttemptService {
@@ -675,36 +676,54 @@ export class AttemptService {
     const mappings = await this.configService.getMappings();
 
     // Transform data with display names - simplified response
-    const transformedAttempts = attempts.map((attempt) => ({
-      id: attempt.id,
-      participantName: attempt.participantName,
-      email: attempt.email,
-      nij: attempt.nij,
-      servoNumber: attempt.servoNumber,
-      serviceKey: attempt.serviceKey,
-      quizId: attempt.quizId,
-      quizTitle: attempt.quiz?.title || 'Unknown Quiz',
-      quizServiceKey: attempt.quiz?.serviceKey,
-      quizServiceName: attempt.quiz?.serviceKey
-        ? mappings.services.mapping[attempt.quiz.serviceKey] ||
-          attempt.quiz.serviceKey
-        : 'No Service',
-      locationKey: attempt.quiz?.locationKey,
-      locationName: attempt.quiz?.locationKey
-        ? mappings.locations.mapping[attempt.quiz.locationKey] ||
-          attempt.quiz.locationKey
-        : 'No Location',
-      score: attempt.score,
-      correctAnswers: attempt.correctAnswers,
-      totalQuestions: attempt.totalQuestions,
-      grade: attempt.grade,
-      passed: attempt.passed,
-      startedAt: attempt.startedAt,
-      completedAt: attempt.completedAt,
-      submittedAt: attempt.submittedAt,
-      createdAt: attempt.createdAt,
-      updatedAt: attempt.updatedAt,
-    }));
+    const transformedAttempts = attempts.map((attempt) => {
+      const status = getAttemptStatus({
+        submittedAt: attempt.submittedAt,
+        endDateTime: attempt.endDateTime,
+      });
+
+      return {
+        id: attempt.id,
+        participantName: attempt.participantName,
+        email: attempt.email,
+        nij: attempt.nij,
+        servoNumber: attempt.servoNumber,
+        serviceKey: attempt.serviceKey,
+        quizId: attempt.quizId,
+        quizTitle: attempt.quiz?.title || 'Unknown Quiz',
+        quizServiceKey: attempt.quiz?.serviceKey,
+        quizServiceName: attempt.quiz?.serviceKey
+          ? mappings.services.mapping[attempt.quiz.serviceKey] ||
+            attempt.quiz.serviceKey
+          : 'No Service',
+        locationKey: attempt.quiz?.locationKey,
+        locationName: attempt.quiz?.locationKey
+          ? mappings.locations.mapping[attempt.quiz.locationKey] ||
+            attempt.quiz.locationKey
+          : 'No Location',
+        score: attempt.score,
+        correctAnswers: attempt.correctAnswers,
+        totalQuestions: attempt.totalQuestions,
+        grade: attempt.grade,
+        passed: attempt.passed,
+        status: status,
+        statusLabel: getStatusLabel(status),
+        startedAt: attempt.startedAt,
+        startedAtWIB: toWIB(attempt.startedAt),
+        completedAt: attempt.completedAt,
+        completedAtWIB: toWIB(attempt.completedAt),
+        submittedAt: attempt.submittedAt,
+        submittedAtWIB: toWIB(attempt.submittedAt),
+        startDateTime: attempt.startDateTime,
+        startDateTimeWIB: toWIB(attempt.startDateTime),
+        endDateTime: attempt.endDateTime,
+        endDateTimeWIB: toWIB(attempt.endDateTime),
+        createdAt: attempt.createdAt,
+        createdAtWIB: toWIB(attempt.createdAt),
+        updatedAt: attempt.updatedAt,
+        updatedAtWIB: toWIB(attempt.updatedAt),
+      };
+    });
 
     const totalPages = Math.ceil(total / limit);
 
