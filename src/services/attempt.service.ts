@@ -68,6 +68,28 @@ export class AttemptService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
+    // Check if NIJ already exists (must be unique globally)
+    const existingNij = await this.attemptRepository.findOne({
+      where: { nij: createAttemptDto.nij },
+    });
+
+    if (existingNij) {
+      throw new BadRequestException(
+        `NIJ ${createAttemptDto.nij} sudah pernah digunakan. NIJ harus unik.`,
+      );
+    }
+
+    // Check if email already exists (must be unique globally)
+    const existingEmail = await this.attemptRepository.findOne({
+      where: { email: createAttemptDto.email },
+    });
+
+    if (existingEmail) {
+      throw new BadRequestException(
+        `Email ${createAttemptDto.email} sudah pernah digunakan. Email harus unik.`,
+      );
+    }
+
     // Check if participant already attempted this quiz
     const existingAttempt = await this.attemptRepository.findOne({
       where: {
@@ -197,6 +219,28 @@ export class AttemptService {
       // Use existing attempt for submission
       savedAttempt = existingAttempt;
     } else {
+      // Check if NIJ already exists (must be unique globally)
+      const existingNij = await this.attemptRepository.findOne({
+        where: { nij: createAttemptDto.nij },
+      });
+
+      if (existingNij) {
+        throw new BadRequestException(
+          `NIJ ${createAttemptDto.nij} sudah pernah digunakan. NIJ harus unik.`,
+        );
+      }
+
+      // Check if email already exists (must be unique globally)
+      const existingEmail = await this.attemptRepository.findOne({
+        where: { email: createAttemptDto.email },
+      });
+
+      if (existingEmail) {
+        throw new BadRequestException(
+          `Email ${createAttemptDto.email} sudah pernah digunakan. Email harus unik.`,
+        );
+      }
+
       // Calculate start and end date time for new attempt
       const startDateTime = new Date();
       let endDateTime: Date | null = null;
