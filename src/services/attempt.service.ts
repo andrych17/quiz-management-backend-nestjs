@@ -465,11 +465,15 @@ export class AttemptService {
     quizId?: number,
     serviceKey?: string,
     locationKey?: string,
+    submissionStatus?: string,
+    passStatus?: string,
   ): Promise<Buffer> {
     DebugLogger.service('AttemptService', 'exportAttemptsToExcel', {
       quizId,
       serviceKey,
       locationKey,
+      submissionStatus,
+      passStatus,
     });
 
     // Build query with filters
@@ -497,6 +501,24 @@ export class AttemptService {
       queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
     }
 
+    // Filter by submission status
+    if (submissionStatus && submissionStatus !== 'all') {
+      if (submissionStatus === 'submitted') {
+        queryBuilder.andWhere('attempt.submittedAt IS NOT NULL');
+      } else if (submissionStatus === 'not_submitted') {
+        queryBuilder.andWhere('attempt.submittedAt IS NULL');
+      }
+    }
+
+    // Filter by pass status
+    if (passStatus && passStatus !== 'all') {
+      if (passStatus === 'passed') {
+        queryBuilder.andWhere('attempt.passed = :passed', { passed: true });
+      } else if (passStatus === 'failed') {
+        queryBuilder.andWhere('attempt.passed = :passed', { passed: false });
+      }
+    }
+
     const attempts = await queryBuilder
       .orderBy('attempt.submittedAt', 'DESC')
       .getMany();
@@ -516,7 +538,7 @@ export class AttemptService {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Quiz Results');
 
-    // Set column headers (removed Grade)
+    // Set column headers with 2 status columns
     worksheet.columns = [
       { header: 'Participant Name', key: 'participantName', width: 25 },
       { header: 'Email', key: 'email', width: 30 },
@@ -525,7 +547,8 @@ export class AttemptService {
       { header: 'Score', key: 'score', width: 10 },
       { header: 'Correct Answers', key: 'correctAnswers', width: 18 },
       { header: 'Total Questions', key: 'totalQuestions', width: 18 },
-      { header: 'Passed', key: 'passed', width: 10 },
+      { header: 'Submission Status', key: 'submissionStatus', width: 20 },
+      { header: 'Pass Status', key: 'passStatus', width: 15 },
       { header: 'Started At', key: 'startedAt', width: 20 },
       { header: 'Completed At', key: 'completedAt', width: 20 },
     ];
@@ -543,6 +566,11 @@ export class AttemptService {
 
     // Add data rows
     attempts.forEach((attempt) => {
+      const submissionStatus = attempt.submittedAt ? 'Submitted' : 'Not Submitted';
+      const passStatus = attempt.submittedAt 
+        ? (attempt.passed ? 'Passed' : 'Failed')
+        : '-';
+
       const row = worksheet.addRow({
         participantName: attempt.participantName,
         email: attempt.email,
@@ -551,7 +579,8 @@ export class AttemptService {
         score: attempt.score,
         correctAnswers: attempt.correctAnswers,
         totalQuestions: attempt.totalQuestions,
-        passed: attempt.passed ? 'Yes' : 'No',
+        submissionStatus: submissionStatus,
+        passStatus: passStatus,
         startedAt: attempt.startedAt
           ? new Date(attempt.startedAt).toLocaleString('id-ID')
           : '-',
@@ -560,22 +589,42 @@ export class AttemptService {
           : '-',
       });
 
-      // Conditional formatting for passed status
-      const passedCell = row.getCell('passed');
-      if (attempt.passed) {
-        passedCell.fill = {
+      // Conditional formatting for submission status
+      const submissionCell = row.getCell('submissionStatus');
+      if (attempt.submittedAt) {
+        submissionCell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FFC6EFCE' }, // Light green
+          fgColor: { argb: 'FFD9E1F2' }, // Light blue
         };
-        passedCell.font = { color: { argb: 'FF006100' } }; // Dark green
+        submissionCell.font = { color: { argb: 'FF1F4E78' } }; // Dark blue
       } else {
-        passedCell.fill = {
+        submissionCell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FFFFC7CE' }, // Light red
+          fgColor: { argb: 'FFFFF2CC' }, // Light yellow
         };
-        passedCell.font = { color: { argb: 'FF9C0006' } }; // Dark red
+        submissionCell.font = { color: { argb: 'FF7F6000' } }; // Dark yellow
+      }
+
+      // Conditional formatting for pass status
+      const passStatusCell = row.getCell('passStatus');
+      if (attempt.submittedAt) {
+        if (attempt.passed) {
+          passStatusCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFC6EFCE' }, // Light green
+          };
+          passStatusCell.font = { color: { argb: 'FF006100' } }; // Dark green
+        } else {
+          passStatusCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFC7CE' }, // Light red
+          };
+          passStatusCell.font = { color: { argb: 'FF9C0006' } }; // Dark red
+        }
       }
     });
 
@@ -591,20 +640,30 @@ export class AttemptService {
       '',
       '',
       '',
+      '',
     ]);
     const titleRow = worksheet.getRow(1);
     titleRow.font = { bold: true, size: 14 };
     titleRow.height = 25;
 
-    // Add summary row
+    // Add summary row with submission and pass status counts
     const summaryRowIndex = worksheet.rowCount + 2;
+    const submittedCount = attempts.filter((a) => a.submittedAt).length;
+    const notSubmittedCount = attempts.length - submittedCount;
+    const passedCount = attempts.filter((a) => a.passed && a.submittedAt).length;
+    const failedCount = attempts.filter((a) => !a.passed && a.submittedAt).length;
+
     worksheet.getCell(`A${summaryRowIndex}`).value = 'Summary:';
     worksheet.getCell(`B${summaryRowIndex}`).value =
       `Total Attempts: ${attempts.length}`;
     worksheet.getCell(`D${summaryRowIndex}`).value =
-      `Passed: ${attempts.filter((a) => a.passed).length}`;
+      `Submitted: ${submittedCount}`;
     worksheet.getCell(`F${summaryRowIndex}`).value =
-      `Failed: ${attempts.filter((a) => !a.passed).length}`;
+      `Not Submitted: ${notSubmittedCount}`;
+    worksheet.getCell(`H${summaryRowIndex}`).value =
+      `Passed: ${passedCount}`;
+    worksheet.getCell(`J${summaryRowIndex}`).value =
+      `Failed: ${failedCount}`;
 
     const summaryRow = worksheet.getRow(summaryRowIndex);
     summaryRow.font = { bold: true };
@@ -645,6 +704,8 @@ export class AttemptService {
     quizName?: string,
     startDate?: string,
     endDate?: string,
+    submissionStatus?: string,
+    passStatus?: string,
   ) {
     const skip = (page - 1) * limit;
 
@@ -692,6 +753,24 @@ export class AttemptService {
           'UPPER(quiz.title) LIKE UPPER(:search))',
         { search: `%${search}%` },
       );
+    }
+
+    // Filter by submission status
+    if (submissionStatus && submissionStatus !== 'all') {
+      if (submissionStatus === 'submitted') {
+        queryBuilder.andWhere('attempt.submittedAt IS NOT NULL');
+      } else if (submissionStatus === 'not_submitted') {
+        queryBuilder.andWhere('attempt.submittedAt IS NULL');
+      }
+    }
+
+    // Filter by pass status
+    if (passStatus && passStatus !== 'all') {
+      if (passStatus === 'passed') {
+        queryBuilder.andWhere('attempt.passed = :passed', { passed: true });
+      } else if (passStatus === 'failed') {
+        queryBuilder.andWhere('attempt.passed = :passed', { passed: false });
+      }
     }
 
     // Date range filter

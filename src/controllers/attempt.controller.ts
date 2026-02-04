@@ -55,6 +55,18 @@ export class AttemptController {
   })
   @ApiQuery({ name: 'startDate', required: false, type: String })
   @ApiQuery({ name: 'endDate', required: false, type: String })
+  @ApiQuery({
+    name: 'submissionStatus',
+    required: false,
+    type: String,
+    description: 'Filter by submission status: submitted, not_submitted, all',
+  })
+  @ApiQuery({
+    name: 'passStatus',
+    required: false,
+    type: String,
+    description: 'Filter by pass status: passed, failed, all',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Attempts retrieved successfully',
@@ -70,6 +82,8 @@ export class AttemptController {
     @Query('quizName') quizName?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('submissionStatus') submissionStatus?: string,
+    @Query('passStatus') passStatus?: string,
   ) {
     DebugLogger.endpoint(
       'GET',
@@ -85,6 +99,8 @@ export class AttemptController {
         quizName,
         startDate,
         endDate,
+        submissionStatus,
+        passStatus,
       },
     );
     return this.attemptService.findAllWithFilter(
@@ -97,6 +113,8 @@ export class AttemptController {
       quizName,
       startDate,
       endDate,
+      submissionStatus,
+      passStatus,
     );
   }
 
@@ -144,6 +162,18 @@ export class AttemptController {
     type: String,
     description: 'Filter by location',
   })
+  @ApiQuery({
+    name: 'submissionStatus',
+    required: false,
+    type: String,
+    description: 'Filter by submission status: submitted, not_submitted, all',
+  })
+  @ApiQuery({
+    name: 'passStatus',
+    required: false,
+    type: String,
+    description: 'Filter by pass status: passed, failed, all',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Quiz attempts exported to Excel successfully',
@@ -152,6 +182,8 @@ export class AttemptController {
     @Query('quizId', new ParseIntPipe({ optional: true })) quizId?: number,
     @Query('serviceKey') serviceKey?: string,
     @Query('locationKey') locationKey?: string,
+    @Query('submissionStatus') submissionStatus?: string,
+    @Query('passStatus') passStatus?: string,
     @Res() res?: Response,
   ) {
     DebugLogger.endpoint(
@@ -162,6 +194,8 @@ export class AttemptController {
         quizId,
         serviceKey,
         locationKey,
+        submissionStatus,
+        passStatus,
       },
     );
 
@@ -169,6 +203,8 @@ export class AttemptController {
       quizId,
       serviceKey,
       locationKey,
+      submissionStatus,
+      passStatus,
     );
 
     const filename = `quiz-attempts-${new Date().toISOString().split('T')[0]}.xlsx`;

@@ -145,19 +145,28 @@ export class DashboardService {
       `Found ${recentAttempts.length} recent attempts`,
     );
 
-    const result = recentAttempts.map((attempt) => ({
-      id: attempt.id,
-      participantName: attempt.participantName,
-      email: attempt.email,
-      nij: attempt.nij,
-      quizId: attempt.quizId,
-      quizTitle: attempt.quiz?.title || 'Unknown Quiz',
-      score: attempt.score,
-      passed: attempt.passed,
-      startedAt: attempt.startedAt,
-      completedAt: attempt.completedAt,
-      submittedAt: attempt.submittedAt,
-    }));
+    const result = recentAttempts.map((attempt) => {
+      const submissionStatus = attempt.submittedAt ? 'submitted' : 'not_submitted';
+      const passStatus = attempt.submittedAt 
+        ? (attempt.passed ? 'passed' : 'failed')
+        : null;
+
+      return {
+        id: attempt.id,
+        participantName: attempt.participantName,
+        email: attempt.email,
+        nij: attempt.nij,
+        quizId: attempt.quizId,
+        quizTitle: attempt.quiz?.title || 'Unknown Quiz',
+        score: attempt.score,
+        passed: attempt.passed,
+        submissionStatus: submissionStatus,
+        passStatus: passStatus,
+        startedAt: attempt.startedAt,
+        completedAt: attempt.completedAt,
+        submittedAt: attempt.submittedAt,
+      };
+    });
 
     return result;
   }
