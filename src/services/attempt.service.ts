@@ -201,10 +201,15 @@ export class AttemptService {
     let savedAttempt: Attempt;
 
     if (existingAttempt) {
-      // Check if attempt time has expired
+      // Check if attempt time has expired (with 5 minutes grace period)
       if (existingAttempt.endDateTime) {
         const now = new Date();
-        if (now > existingAttempt.endDateTime) {
+        const gracePeriodMs = 5 * 60 * 1000; // 5 minutes in milliseconds
+        const endTimeWithGrace = new Date(
+          existingAttempt.endDateTime.getTime() + gracePeriodMs,
+        );
+
+        if (now > endTimeWithGrace) {
           throw new BadRequestException(
             'Quiz attempt time has expired. Submission not allowed.',
           );

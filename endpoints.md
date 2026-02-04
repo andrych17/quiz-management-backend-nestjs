@@ -94,9 +94,75 @@ Get config items with pagination (locations, services, etc).
 
 ## Report Endpoints
 
-### Export Quiz Results to Excel
+### Export All Quiz Attempts to Excel
 
-Download quiz results as an Excel file with formatting.
+Download all quiz attempts as an Excel file with filtering options and dual status columns.
+
+**Endpoint:** `GET /api/attempts/export-excel`
+
+**Query Parameters:**
+- `quizId` (optional): Filter by specific quiz ID
+- `serviceKey` (optional): Filter by service key
+- `locationKey` (optional): Filter by location key
+- `submissionStatus` (optional): Filter by submission status
+  - `submitted`: Only submitted attempts
+  - `not_submitted`: Only attempts not yet submitted
+  - `all`: All attempts (default)
+- `passStatus` (optional): Filter by pass status
+  - `passed`: Only passed attempts
+  - `failed`: Only failed attempts
+  - `all`: All attempts (default)
+
+**Response:**
+- Content-Type: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+- File download with name: `quiz-attempts-{date}.xlsx`
+
+**Excel File Contents:**
+- **Title Row:** "Quiz Results Export"
+- **Headers:** Participant Name, Email, NIJ, Quiz Title, Score, Correct Answers, Total Questions, Submission Status, Pass Status, Started At, Completed At
+- **Data Rows:** All attempt records with conditional formatting:
+  - Submission Status:
+    - Submitted: Blue background
+    - Not Submitted: Yellow background
+  - Pass Status:
+    - Passed: Green background
+    - Failed: Red background
+    - Not applicable (-): No formatting
+- **Summary Row:** Total attempts, submitted count, not submitted count, passed count, failed count
+
+**Example Requests:**
+```bash
+# Export all attempts
+curl -X GET http://localhost:3000/api/attempts/export-excel \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  --output all-quiz-attempts.xlsx
+
+# Export only submitted attempts
+curl -X GET "http://localhost:3000/api/attempts/export-excel?submissionStatus=submitted" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  --output submitted-attempts.xlsx
+
+# Export only passed attempts
+curl -X GET "http://localhost:3000/api/attempts/export-excel?passStatus=passed" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  --output passed-attempts.xlsx
+
+# Export attempts for specific quiz with filtering
+curl -X GET "http://localhost:3000/api/attempts/export-excel?quizId=1&submissionStatus=submitted&passStatus=failed" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  --output quiz-1-failed.xlsx
+```
+
+**Error Responses:**
+- `404 Not Found`: No attempts found with the specified filters
+- `401 Unauthorized`: Missing or invalid authentication token
+- `403 Forbidden`: User does not have admin role
+
+---
+
+### Export Quiz Results to Excel (Legacy)
+
+Download quiz results for a specific quiz as an Excel file with formatting.
 
 **Endpoint:** `GET /api/reports/quiz/:quizId/export-excel`
 
@@ -200,6 +266,8 @@ Get a list of recent quiz attempts with participant and quiz details.
     "quizTitle": "IQ Test - Math & Language",
     "score": 85,
     "passed": true,
+    "submissionStatus": "submitted",
+    "passStatus": "passed",
     "startedAt": "2026-01-18T07:15:30.000Z",
     "completedAt": "2026-01-18T07:45:30.000Z",
     "submittedAt": "2026-01-18T07:45:30.000Z"
@@ -213,9 +281,26 @@ Get a list of recent quiz attempts with participant and quiz details.
     "quizTitle": "General Knowledge Quiz",
     "score": 65,
     "passed": false,
+    "submissionStatus": "submitted",
+    "passStatus": "failed",
     "startedAt": "2026-01-18T06:30:00.000Z",
     "completedAt": "2026-01-18T06:55:00.000Z",
     "submittedAt": "2026-01-18T06:55:00.000Z"
+  },
+  {
+    "id": 121,
+    "participantName": "Bob Wilson",
+    "email": "bob@example.com",
+    "nij": "11111",
+    "quizId": 1,
+    "quizTitle": "IQ Test - Math & Language",
+    "score": 0,
+    "passed": false,
+    "submissionStatus": "not_submitted",
+    "passStatus": null,
+    "startedAt": "2026-01-18T06:00:00.000Z",
+    "completedAt": null,
+    "submittedAt": null
   }
 ]
 ```
@@ -229,6 +314,8 @@ Get a list of recent quiz attempts with participant and quiz details.
 - `quizTitle` (string): Title of the quiz
 - `score` (number): Final score
 - `passed` (boolean): Whether the participant passed the quiz
+- `submissionStatus` (string): Submission status - "submitted" or "not_submitted"
+- `passStatus` (string|null): Pass status - "passed", "failed", or null (if not submitted)
 - `startedAt` (string): ISO 8601 timestamp when the attempt was started
 - `completedAt` (string|null): ISO 8601 timestamp when the attempt was completed
 - `submittedAt` (string|null): ISO 8601 timestamp when the attempt was submitted
@@ -702,6 +789,97 @@ curl -X POST http://localhost:3000/api/public/quiz/ABC123DEF456/submit \
 - `400 Bad Request`: 
   - Data tidak valid
   - Peserta sudah pernah mengerjakan quiz ini (duplicate submission)
+
+---
+
+## Attempt Management Endpoints
+
+### Get All Attempts with Filters
+
+Get all quiz attempts with pagination and advanced filtering options.
+
+**Endpoint:** `GET /api/attempts`
+
+**Authentication Required:** Yes (Admin only)
+
+**Query Parameters:**
+- `page` (optional, default: 1): Page number
+- `limit` (optional, default: 25): Items per page
+- `search` (optional): Search by participant name, email, or NIJ
+- `serviceKey` (optional): Filter by service key
+- `locationKey` (optional): Filter by location key
+- `quizId` (optional): Filter by specific quiz ID
+- `quizName` (optional): Filter by quiz title/name
+- `startDate` (optional): Filter by start date (ISO 8601 format)
+- `endDate` (optional): Filter by end date (ISO 8601 format)
+- `submissionStatus` (optional): Filter by submission status
+  - `submitted`: Only submitted attempts
+  - `not_submitted`: Only attempts not yet submitted
+  - `all`: All attempts (default)
+- `passStatus` (optional): Filter by pass status
+  - `passed`: Only passed attempts
+  - `failed`: Only failed attempts
+  - `all`: All attempts (default)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": 123,
+        "participantName": "John Doe",
+        "email": "john@example.com",
+        "nij": "12345",
+        "quizId": 1,
+        "score": 85,
+        "correctAnswers": 17,
+        "totalQuestions": 20,
+        "passed": true,
+        "startedAt": "2026-01-18T07:15:30.000Z",
+        "completedAt": "2026-01-18T07:45:30.000Z",
+        "submittedAt": "2026-01-18T07:45:30.000Z",
+        "quiz": {
+          "id": 1,
+          "title": "IQ Test - Math & Language"
+        }
+      }
+    ],
+    "total": 150,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 6
+  }
+}
+```
+
+**Example Requests:**
+```bash
+# Get all attempts (paginated)
+curl -X GET "http://localhost:3000/api/attempts?page=1&limit=25" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# Search by participant name
+curl -X GET "http://localhost:3000/api/attempts?search=John" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# Filter by submission status (only submitted)
+curl -X GET "http://localhost:3000/api/attempts?submissionStatus=submitted" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# Filter by pass status (only failed)
+curl -X GET "http://localhost:3000/api/attempts?passStatus=failed" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# Combine multiple filters
+curl -X GET "http://localhost:3000/api/attempts?quizId=1&submissionStatus=submitted&passStatus=passed" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Error Responses:**
+- `401 Unauthorized`: Missing or invalid authentication token
+- `403 Forbidden`: User does not have admin role
 
 ---
 
