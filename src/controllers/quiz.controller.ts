@@ -456,6 +456,9 @@ export class QuizController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update quiz by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
@@ -479,6 +482,9 @@ export class QuizController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete quiz by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
