@@ -80,16 +80,6 @@ export class AttemptService {
     });
 
     if (existingAttempt) {
-      // Check if attempt is still within the valid time window
-      if (existingAttempt.endDateTime) {
-        const now = new Date();
-        if (now > existingAttempt.endDateTime) {
-          throw new BadRequestException(
-            'Quiz attempt time has expired. Please contact administrator.',
-          );
-        }
-      }
-
       // If already submitted, don't allow restart
       if (existingAttempt.submittedAt) {
         throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
@@ -208,21 +198,6 @@ export class AttemptService {
           let savedAttempt: Attempt;
 
           if (existingAttempt) {
-            // Check if attempt time has expired (with 5 minutes grace period)
-            if (existingAttempt.endDateTime) {
-              const now = new Date();
-              const gracePeriodMs = 5 * 60 * 1000; // 5 minutes in milliseconds
-              const endTimeWithGrace = new Date(
-                existingAttempt.endDateTime.getTime() + gracePeriodMs,
-              );
-
-              if (now > endTimeWithGrace) {
-                throw new BadRequestException(
-                  'Quiz attempt time has expired. Submission not allowed.',
-                );
-              }
-            }
-
             // If already submitted, don't allow resubmission
             if (existingAttempt.submittedAt) {
               throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
