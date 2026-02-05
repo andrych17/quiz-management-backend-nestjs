@@ -14,9 +14,8 @@ import { AttemptAnswer } from './attempt-answer.entity';
 
 @Entity('attempts')
 @Index(['quizId', 'email'], { unique: true }) // Prevent duplicate attempts from same email per quiz
+@Index(['quizId', 'nij'], { unique: true }) // Prevent duplicate attempts from same NIJ per quiz
 @Index(['quizId'])
-@Index(['email'], { unique: true }) // Email must be unique globally
-@Index(['nij'], { unique: true }) // NIJ must be unique globally
 export class Attempt {
   @PrimaryGeneratedColumn()
   id: number;
@@ -49,6 +48,9 @@ export class Attempt {
   correctAnswers: number; // Jumlah jawaban benar
 
   @Column({ type: 'int', default: 0 })
+  incorrectAnswers: number; // Jumlah jawaban salah
+
+  @Column({ type: 'int', default: 0 })
   totalQuestions: number; // Total soal
 
   @Column({ default: false })
@@ -56,9 +58,6 @@ export class Attempt {
 
   @CreateDateColumn()
   startedAt: Date;
-
-  @Column({ type: 'timestamp', nullable: true })
-  completedAt: Date;
 
   @Column({ type: 'timestamp', nullable: true })
   submittedAt: Date;

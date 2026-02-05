@@ -2,9 +2,10 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository, Like, DataSource, QueryRunner } from 'typeorm';
 import { Attempt } from '../entities/attempt.entity';
 import { AttemptAnswer } from '../entities/attempt-answer.entity';
 import { Quiz } from '../entities/quiz.entity';
@@ -19,6 +20,7 @@ import { ConfigService } from './config.service';
 import * as ExcelJS from 'exceljs';
 import { DebugLogger } from '../lib/debug-logger';
 import { toWIB, getAttemptStatus, getStatusLabel } from '../utils/datetime.util';
+import { retryAsync, isRetryableError } from '../lib/retry.util';
 
 @Injectable()
 export class AttemptService {
@@ -32,6 +34,7 @@ export class AttemptService {
     @InjectRepository(Question)
     private questionRepository: Repository<Question>,
     private readonly configService: ConfigService,
+    private dataSource: DataSource,
   ) {}
 
   async create(
@@ -68,29 +71,7 @@ export class AttemptService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    // Check if NIJ already exists (must be unique globally)
-    const existingNij = await this.attemptRepository.findOne({
-      where: { nij: createAttemptDto.nij },
-    });
-
-    if (existingNij) {
-      throw new BadRequestException(
-        `NIJ ${createAttemptDto.nij} sudah pernah digunakan. NIJ harus unik.`,
-      );
-    }
-
-    // Check if email already exists (must be unique globally)
-    const existingEmail = await this.attemptRepository.findOne({
-      where: { email: createAttemptDto.email },
-    });
-
-    if (existingEmail) {
-      throw new BadRequestException(
-        `Email ${createAttemptDto.email} sudah pernah digunakan. Email harus unik.`,
-      );
-    }
-
-    // Check if participant already attempted this quiz
+    // Check if participant already attempted this quiz (email and NIJ must be unique per quiz)
     const existingAttempt = await this.attemptRepository.findOne({
       where: {
         email: createAttemptDto.email,
@@ -116,6 +97,20 @@ export class AttemptService {
 
       // Allow resume - return existing attempt
       return this.findOne(existingAttempt.id);
+    }
+
+    // Also check NIJ uniqueness for this quiz
+    const existingNijAttempt = await this.attemptRepository.findOne({
+      where: {
+        nij: createAttemptDto.nij,
+        quizId: createAttemptDto.quizId,
+      },
+    });
+
+    if (existingNijAttempt) {
+      throw new BadRequestException(
+        `NIJ ${createAttemptDto.nij} sudah pernah digunakan untuk quiz ini.`,
+      );
     }
 
     // Calculate start and end date time
@@ -180,185 +175,230 @@ export class AttemptService {
   private async submitQuizAttempt(
     createAttemptDto: CreateAttemptDto,
   ): Promise<AttemptResponseDto> {
-    // Verify quiz exists and load scoring templates
-    const quiz = await this.quizRepository.findOne({
-      where: { id: createAttemptDto.quizId },
-      relations: ['questions', 'scoringTemplates'],
-    });
+    // Use database transaction with retry for concurrent submissions
+    return retryAsync(
+      async () => {
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction('SERIALIZABLE'); // Use SERIALIZABLE isolation level
 
-    if (!quiz) {
-      throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
-    }
+        try {
+          // Verify quiz exists and load scoring templates
+          const quiz = await queryRunner.manager.findOne(Quiz, {
+            where: { id: createAttemptDto.quizId },
+            relations: ['questions', 'scoringTemplates'],
+            // Note: No pessimistic lock here because SERIALIZABLE transaction provides sufficient isolation
+            // and pessimistic locks don't work with relations (LEFT JOIN issue)
+          });
 
-    // Check if participant already attempted this quiz
-    const existingAttempt = await this.attemptRepository.findOne({
-      where: {
-        email: createAttemptDto.email,
-        quizId: createAttemptDto.quizId,
-      },
-    });
+          if (!quiz) {
+            throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
+          }
 
-    let savedAttempt: Attempt;
+          // Check if participant already attempted this quiz (with lock to prevent race condition)
+          const existingAttempt = await queryRunner.manager.findOne(Attempt, {
+            where: {
+              email: createAttemptDto.email,
+              quizId: createAttemptDto.quizId,
+            },
+            // Note: No relations here, so pessimistic lock works fine
+            lock: { mode: 'pessimistic_write' }, // Lock to prevent duplicate submissions
+          });
 
-    if (existingAttempt) {
-      // Check if attempt time has expired (with 5 minutes grace period)
-      if (existingAttempt.endDateTime) {
-        const now = new Date();
-        const gracePeriodMs = 5 * 60 * 1000; // 5 minutes in milliseconds
-        const endTimeWithGrace = new Date(
-          existingAttempt.endDateTime.getTime() + gracePeriodMs,
-        );
+          let savedAttempt: Attempt;
 
-        if (now > endTimeWithGrace) {
-          throw new BadRequestException(
-            'Quiz attempt time has expired. Submission not allowed.',
-          );
-        }
-      }
+          if (existingAttempt) {
+            // Check if attempt time has expired (with 5 minutes grace period)
+            if (existingAttempt.endDateTime) {
+              const now = new Date();
+              const gracePeriodMs = 5 * 60 * 1000; // 5 minutes in milliseconds
+              const endTimeWithGrace = new Date(
+                existingAttempt.endDateTime.getTime() + gracePeriodMs,
+              );
 
-      // If already submitted, don't allow resubmission
-      if (existingAttempt.submittedAt) {
-        throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
-      }
-
-      // Use existing attempt for submission
-      savedAttempt = existingAttempt;
-    } else {
-      // Check if NIJ already exists (must be unique globally)
-      const existingNij = await this.attemptRepository.findOne({
-        where: { nij: createAttemptDto.nij },
-      });
-
-      if (existingNij) {
-        throw new BadRequestException(
-          `NIJ ${createAttemptDto.nij} sudah pernah digunakan. NIJ harus unik.`,
-        );
-      }
-
-      // Check if email already exists (must be unique globally)
-      const existingEmail = await this.attemptRepository.findOne({
-        where: { email: createAttemptDto.email },
-      });
-
-      if (existingEmail) {
-        throw new BadRequestException(
-          `Email ${createAttemptDto.email} sudah pernah digunakan. Email harus unik.`,
-        );
-      }
-
-      // Calculate start and end date time for new attempt
-      const startDateTime = new Date();
-      let endDateTime: Date | null = null;
-
-      if (quiz.durationMinutes) {
-        endDateTime = new Date(
-          startDateTime.getTime() + quiz.durationMinutes * 60000,
-        );
-      }
-
-      // Create new attempt
-      const attempt = this.attemptRepository.create({
-        quizId: createAttemptDto.quizId,
-        participantName: createAttemptDto.participantName,
-        email: createAttemptDto.email,
-        nij: createAttemptDto.nij,
-        servoNumber: createAttemptDto.servoNumber,
-        serviceKey: createAttemptDto.serviceKey,
-        startedAt: new Date(),
-        startDateTime: startDateTime,
-        endDateTime: endDateTime,
-      });
-
-      savedAttempt = await this.attemptRepository.save(attempt);
-    }
-
-    // Process answers and calculate score
-    let correctAnswers = 0;
-    const totalQuestions = quiz.questions.length;
-
-    for (const answerDto of createAttemptDto.answers) {
-      const question = quiz.questions.find(
-        (q) => q.id === answerDto.questionId,
-      );
-      if (!question) continue;
-
-      const isCorrect = question.correctAnswer === answerDto.answer;
-      if (isCorrect) correctAnswers++;
-
-      const attemptAnswer = this.attemptAnswerRepository.create({
-        attemptId: savedAttempt.id,
-        questionId: answerDto.questionId,
-        answerText: answerDto.answer,
-      });
-
-      await this.attemptAnswerRepository.save(attemptAnswer);
-    }
-
-    // Update attempt with score and completion time using scoring templates
-    const incorrectAnswers = totalQuestions - correctAnswers;
-
-    // Gunakan scoring system dari quiz (IPK mode atau standard points mode)
-    let finalScore = 0;
-    let grade = 'F';
-    let passed = false;
-
-    DebugLogger.debug('AttemptService', 'Calculating score', {
-      correctAnswers,
-      totalQuestions,
-      hasScoringTemplates: quiz.scoringTemplates?.length > 0,
-      scoringTemplatesCount: quiz.scoringTemplates?.length || 0,
-    });
-
-    if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
-      // Mode IQ/Custom Scoring: Cari nilai berdasarkan jumlah benar
-      const matchingTemplate = quiz.scoringTemplates.find(
-        (template) => template.correctAnswers === correctAnswers,
-      );
-
-      DebugLogger.debug('AttemptService', 'Searching for matching template', {
-        correctAnswers,
-        matchingTemplate: matchingTemplate
-          ? {
-              id: matchingTemplate.id,
-              correctAnswers: matchingTemplate.correctAnswers,
-              points: matchingTemplate.points,
+              if (now > endTimeWithGrace) {
+                throw new BadRequestException(
+                  'Quiz attempt time has expired. Submission not allowed.',
+                );
+              }
             }
-          : null,
-      });
 
-      if (matchingTemplate) {
-        finalScore = matchingTemplate.points; // Nilai akhir dari tabel konversi (73, 74, 72, dll)
-        DebugLogger.success('AttemptService', 'Using scoring template', {
-          finalScore,
-        });
-      } else {
-        // Fallback ke standard scoring (0-100) jika tidak ada template yang cocok
-        finalScore = Math.round((correctAnswers / totalQuestions) * 100);
-        DebugLogger.warn('AttemptService', 'No matching template, using fallback', {
-          finalScore,
-        });
+            // If already submitted, don't allow resubmission
+            if (existingAttempt.submittedAt) {
+              throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
+            }
+
+            // Use existing attempt for submission
+            savedAttempt = existingAttempt;
+          } else {
+            // Check if NIJ already used for this quiz
+            const existingNijAttempt = await queryRunner.manager.findOne(
+              Attempt,
+              {
+                where: {
+                  nij: createAttemptDto.nij,
+                  quizId: createAttemptDto.quizId,
+                },
+              },
+            );
+
+            if (existingNijAttempt) {
+              throw new BadRequestException(
+                `NIJ ${createAttemptDto.nij} sudah pernah digunakan untuk quiz ini.`,
+              );
+            }
+
+            // Calculate start and end date time for new attempt
+            const startDateTime = new Date();
+            let endDateTime: Date | null = null;
+
+            if (quiz.durationMinutes) {
+              endDateTime = new Date(
+                startDateTime.getTime() + quiz.durationMinutes * 60000,
+              );
+            }
+
+            // Create new attempt
+            const attempt = queryRunner.manager.create(Attempt, {
+              quizId: createAttemptDto.quizId,
+              participantName: createAttemptDto.participantName,
+              email: createAttemptDto.email,
+              nij: createAttemptDto.nij,
+              servoNumber: createAttemptDto.servoNumber,
+              serviceKey: createAttemptDto.serviceKey,
+              startedAt: new Date(),
+              startDateTime: startDateTime,
+              endDateTime: endDateTime,
+            });
+
+            savedAttempt = await queryRunner.manager.save(attempt);
+          }
+
+          // Process answers and calculate score
+          let correctAnswers = 0;
+          const totalQuestions = quiz.questions.length;
+
+          for (const answerDto of createAttemptDto.answers) {
+            const question = quiz.questions.find(
+              (q) => q.id === answerDto.questionId,
+            );
+            if (!question) continue;
+
+            const isCorrect = question.correctAnswer === answerDto.answer;
+            if (isCorrect) correctAnswers++;
+
+            const attemptAnswer = queryRunner.manager.create(AttemptAnswer, {
+              attemptId: savedAttempt.id,
+              questionId: answerDto.questionId,
+              answerText: answerDto.answer,
+            });
+
+            await queryRunner.manager.save(attemptAnswer);
+          }
+
+          // Update attempt with score and completion time using scoring templates
+          const incorrectAnswers = totalQuestions - correctAnswers;
+
+          // Gunakan scoring system dari quiz (IPK mode atau standard points mode)
+          let finalScore = 0;
+          let grade = 'F';
+          let passed = false;
+
+          DebugLogger.debug('AttemptService', 'Calculating score', {
+            correctAnswers,
+            totalQuestions,
+            hasScoringTemplates: quiz.scoringTemplates?.length > 0,
+            scoringTemplatesCount: quiz.scoringTemplates?.length || 0,
+          });
+
+          if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
+            // Mode IQ/Custom Scoring: Cari nilai berdasarkan jumlah benar
+            const matchingTemplate = quiz.scoringTemplates.find(
+              (template) => template.correctAnswers === correctAnswers,
+            );
+
+            DebugLogger.debug('AttemptService', 'Searching for matching template', {
+              correctAnswers,
+              matchingTemplate: matchingTemplate
+                ? {
+                    id: matchingTemplate.id,
+                    correctAnswers: matchingTemplate.correctAnswers,
+                    points: matchingTemplate.points,
+                  }
+                : null,
+            });
+
+            if (matchingTemplate) {
+              finalScore = matchingTemplate.points; // Nilai akhir dari tabel konversi (73, 74, 72, dll)
+              DebugLogger.success('AttemptService', 'Using scoring template', {
+                finalScore,
+              });
+            } else {
+              // Fallback ke standard scoring (0-100) jika tidak ada template yang cocok
+              finalScore = Math.round((correctAnswers / totalQuestions) * 100);
+              DebugLogger.warn(
+                'AttemptService',
+                'No matching template, using fallback',
+                {
+                  finalScore,
+                },
+              );
+            }
+          } else {
+            // Mode default: gunakan standard scoring (0-100)
+            finalScore = Math.round((correctAnswers / totalQuestions) * 100);
+            DebugLogger.debug('AttemptService', 'No scoring templates, using default', {
+              finalScore,
+            });
+          }
+
+          passed = finalScore >= (quiz.passingScore || 70);
+
+          // Update attempt with final score
+          savedAttempt.score = finalScore;
+          savedAttempt.grade = grade;
+          savedAttempt.passed = passed;
+          savedAttempt.submittedAt = new Date();
+          savedAttempt.correctAnswers = correctAnswers;
+          savedAttempt.incorrectAnswers = incorrectAnswers;
+          savedAttempt.totalQuestions = totalQuestions; // ✅ Add this field
+
+          await queryRunner.manager.save(savedAttempt);
+
+          // Commit transaction
+          await queryRunner.commitTransaction();
+
+          return this.findOne(savedAttempt.id);
+        } catch (error) {
+          // Rollback transaction on error
+          await queryRunner.rollbackTransaction();
+          throw error;
+        } finally {
+          // Release query runner
+          await queryRunner.release();
+        }
+      },
+      {
+        maxAttempts: 3,
+        delayMs: 100,
+        backoffMultiplier: 2,
+        onRetry: (attempt, error) => {
+          DebugLogger.warn(
+            'AttemptService',
+            `Retrying submitQuizAttempt (attempt ${attempt})`,
+            { error: error.message },
+          );
+        },
+      },
+    ).catch((error) => {
+      // Handle final error after all retries
+      if (isRetryableError(error)) {
+        throw new InternalServerErrorException(
+          'Server is busy. Please try again in a moment.',
+        );
       }
-    } else {
-      // Mode default: gunakan standard scoring (0-100)
-      finalScore = Math.round((correctAnswers / totalQuestions) * 100);
-      DebugLogger.debug('AttemptService', 'No scoring templates, using default', {
-        finalScore,
-      });
-    }
-
-    passed = finalScore >= (quiz.passingScore || 70);
-
-    await this.attemptRepository.update(savedAttempt.id, {
-      score: finalScore,
-      grade: grade,
-      correctAnswers: correctAnswers,
-      totalQuestions: totalQuestions,
-      passed,
-      completedAt: new Date(),
-      submittedAt: new Date(),
+      throw error;
     });
-
-    return this.findOne(savedAttempt.id);
   }
 
   async findAll(
@@ -555,7 +595,6 @@ export class AttemptService {
       { header: 'Submission Status', key: 'submissionStatus', width: 20 },
       { header: 'Pass Status', key: 'passStatus', width: 15 },
       { header: 'Started At', key: 'startedAt', width: 20 },
-      { header: 'Completed At', key: 'completedAt', width: 20 },
     ];
 
     // Style header row
@@ -588,9 +627,6 @@ export class AttemptService {
         passStatus: passStatus,
         startedAt: attempt.startedAt
           ? new Date(attempt.startedAt).toLocaleString('id-ID')
-          : '-',
-        completedAt: attempt.completedAt
-          ? new Date(attempt.completedAt).toLocaleString('id-ID')
           : '-',
       });
 
@@ -838,8 +874,6 @@ export class AttemptService {
         statusLabel: getStatusLabel(status),
         startedAt: attempt.startedAt,
         startedAtWIB: toWIB(attempt.startedAt),
-        completedAt: attempt.completedAt,
-        completedAtWIB: toWIB(attempt.completedAt),
         submittedAt: attempt.submittedAt,
         submittedAtWIB: toWIB(attempt.submittedAt),
         startDateTime: attempt.startDateTime,
@@ -944,13 +978,11 @@ export class AttemptService {
           : 'No Location',
         passingScore: attempt.quiz.passingScore,
         createdAt: attempt.quiz.createdAt,
-        completedAt: attempt.completedAt,
       },
       score: attempt.score,
       grade: attempt.grade,
       passed: attempt.passed,
       startedAt: attempt.startedAt,
-      completedAt: attempt.completedAt,
       submittedAt: attempt.submittedAt,
       answers: detailedAnswers,
       summary: {

@@ -6,8 +6,9 @@ import {
   Param,
   HttpStatus,
   BadRequestException,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { AttemptService } from '../services/attempt.service';
 import { ConfigService } from '../services/config.service';
@@ -17,9 +18,12 @@ import {
   ApiResponse as StdApiResponse,
   ResponseFactory,
 } from '../interfaces/api-response.interface';
+import { Idempotent } from '../decorators/idempotent.decorator';
+import { IdempotencyInterceptor } from '../interceptors/idempotency.interceptor';
 
 @ApiTags('public')
 @Controller('api/public')
+@UseInterceptors(IdempotencyInterceptor)
 export class PublicController {
   constructor(
     private readonly quizService: QuizService,
@@ -272,16 +276,22 @@ export class PublicController {
   }
 
   @Post('quiz/:token/submit')
+  @Idempotent(300) // Cache idempotent responses for 5 minutes
   @ApiOperation({
     summary: 'Submit jawaban quiz (tanpa autentikasi)',
     description:
-      'Endpoint untuk submit jawaban quiz secara publik. Memerlukan input NIJ, email, nama, dan jawaban.',
+      'Endpoint untuk submit jawaban quiz secara publik. Memerlukan input NIJ, email, nama, dan jawaban. Supports idempotency for safe retries.',
   })
   @ApiParam({
     name: 'token',
     type: String,
     description: 'Token quiz untuk submit attempt',
     example: 'ABC123DEF456',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    description: 'Optional idempotency key to prevent duplicate submissions',
+    required: false,
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -296,6 +306,10 @@ export class PublicController {
     status: HttpStatus.BAD_REQUEST,
     description:
       'Data tidak valid atau peserta sudah pernah mengerjakan quiz ini',
+  })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description: 'Too many requests. Please try again later.',
   })
   async submitQuizAttempt(
     @Param('token') token: string,

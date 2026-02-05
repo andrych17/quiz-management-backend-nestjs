@@ -163,7 +163,6 @@ export class DashboardService {
         submissionStatus: submissionStatus,
         passStatus: passStatus,
         startedAt: attempt.startedAt,
-        completedAt: attempt.completedAt,
         submittedAt: attempt.submittedAt,
       };
     });

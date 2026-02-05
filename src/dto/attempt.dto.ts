@@ -136,10 +136,10 @@ export class UpdateAttemptDto {
 
   @ApiPropertyOptional({
     example: '2024-01-01T12:00:00.000Z',
-    description: 'Completion date',
+    description: 'Submission date',
   })
   @IsOptional()
-  completedAt?: Date;
+  submittedAt?: Date;
 }
 
 export class AttemptResponseDto {
@@ -184,12 +184,6 @@ export class AttemptResponseDto {
     description: 'Start time',
   })
   startedAt: Date;
-
-  @ApiPropertyOptional({
-    example: '2024-01-01T12:00:00.000Z',
-    description: 'Completion time',
-  })
-  completedAt?: Date;
 
   @ApiPropertyOptional({
     example: '2024-01-01T12:00:00.000Z',

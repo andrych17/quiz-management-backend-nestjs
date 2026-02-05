@@ -4,11 +4,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { APP_URLS } from './constants';
 import { ResponseInterceptor } from './interceptors/response.interceptor';
+import { IdempotencyInterceptor } from './interceptors/idempotency.interceptor';
 import { GlobalExceptionFilter } from './filters/global-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as express from 'express';
 import * as dotenv from 'dotenv';
+import { Reflector } from '@nestjs/core';
 
 // Load environment variables at the very start
 dotenv.config();
@@ -40,7 +42,11 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  
+  // Add idempotency interceptor for handling concurrent requests
+  const reflector = app.get(Reflector);
   app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(new IdempotencyInterceptor(reflector));
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   // Handle favicon requests
@@ -57,7 +63,7 @@ async function bootstrap() {
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'idempotency-key'],
   });
 
   // Swagger configuration (only in development)

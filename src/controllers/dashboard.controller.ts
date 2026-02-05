@@ -103,7 +103,6 @@ export class DashboardController {
           score: { type: 'number', example: 85 },
           passed: { type: 'boolean', example: true },
           startedAt: { type: 'string', format: 'date-time' },
-          completedAt: { type: 'string', format: 'date-time', nullable: true },
           submittedAt: { type: 'string', format: 'date-time', nullable: true },
         },
       },

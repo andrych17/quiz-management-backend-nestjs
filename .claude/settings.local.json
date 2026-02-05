@@ -13,7 +13,11 @@
       "Bash(timeout 10 npm start:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: resolve Render deployment build failure and environment variable loading\n\n- Move @nestjs/cli, typescript, and ts-node to dependencies for Render builds\n- Add dotenv.config\\(\\) at application startup in main.ts\n- Remove duplicate dotenv loading from database.config.ts\n\nThis fixes two critical issues:\n1. Render build failing with \"nest: not found\" error\n2. Environment variables loading 0 values when running compiled code\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd //c taskkill //F //IM node.exe)"
     ]
   }
 }
