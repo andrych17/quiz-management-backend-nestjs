@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository, Like, Not } from 'typeorm';
 import { Quiz } from '../entities/quiz.entity';
 import { Question } from '../entities/question.entity';
 import { QuizImage } from '../entities/quiz-image.entity';
@@ -61,6 +61,56 @@ export class QuizService {
     if (!filePath) return '';
     if (filePath.startsWith('http')) return filePath; // Already full URL
     return `${APP_URLS.FILE_SERVER_URL}/${filePath}`;
+  }
+
+  // Helper method to check if image file is still used by other questions
+  private async isImageStillInUse(
+    fileName: string,
+    excludeImageId?: number,
+  ): Promise<boolean> {
+    const whereClause: any = {
+      fileName,
+      isActive: true,
+    };
+
+    if (excludeImageId) {
+      whereClause.id = Not(excludeImageId); // Exclude current image being deleted
+    }
+
+    const count = await this.quizImageRepository.count({
+      where: whereClause,
+    });
+
+    return count > 0;
+  }
+
+  // Helper method to safely delete image from R2 storage
+  private async safeDeleteImageFile(
+    fileName: string,
+    excludeImageId?: number,
+  ): Promise<void> {
+    // Check if file is still used by other quiz_images records
+    const stillInUse = await this.isImageStillInUse(fileName, excludeImageId);
+
+    if (stillInUse) {
+      DebugLogger.debug(
+        'QuizService',
+        `Skipping delete for ${fileName} - still in use by other questions`,
+      );
+      return;
+    }
+
+    // Safe to delete from R2
+    try {
+      await this.r2StorageService.deleteFile(fileName);
+      DebugLogger.debug('QuizService', `Deleted image from R2: ${fileName}`);
+    } catch (error) {
+      DebugLogger.error(
+        'QuizService',
+        `Failed to delete image ${fileName}`,
+        error.message,
+      );
+    }
   }
 
   async create(
@@ -211,6 +261,115 @@ export class QuizService {
           DebugLogger.debug('QuizService', `Saved question ${i + 1}`, {
             id: savedQuestion.id,
           });
+
+          // Handle question images (multiple images support)
+          if (
+            questionData.imagesBase64 &&
+            questionData.imagesBase64.length > 0
+          ) {
+            try {
+              for (
+                let imgIdx = 0;
+                imgIdx < questionData.imagesBase64.length;
+                imgIdx++
+              ) {
+                const imgData = questionData.imagesBase64[imgIdx];
+                const imgSequence = imgData.sequence || imgIdx + 1;
+
+                // Check if this is new base64 data
+                const isBase64 =
+                  imgData.imageBase64 &&
+                  imgData.imageBase64.startsWith('data:');
+
+                if (isBase64) {
+                  // Upload new image to storage
+                  const fileInfo =
+                    await this.fileUploadService.uploadFromBase64(
+                      imgData.imageBase64,
+                      imgData.originalName ||
+                        `question_image_${imgSequence}.jpg`,
+                      `question/${savedQuestion.id}`,
+                    );
+
+                  // Create new image record
+                  const imageRecord = this.quizImageRepository.create({
+                    questionId: savedQuestion.id,
+                    sequence: imgSequence,
+                    fileName: fileInfo.fileName,
+                    originalName: fileInfo.originalName,
+                    mimeType: fileInfo.mimeType,
+                    fileSize: fileInfo.fileSize,
+                    altText: imgData.altText,
+                    isActive: true,
+                  });
+
+                  await this.quizImageRepository.save(imageRecord);
+                  DebugLogger.debug(
+                    'QuizService',
+                    `Created image seq ${imgSequence} for question ${i + 1}`,
+                  );
+                }
+              }
+              DebugLogger.debug(
+                'QuizService',
+                `Processed ${questionData.imagesBase64.length} images for question ${i + 1}`,
+              );
+            } catch (uploadError) {
+              DebugLogger.error(
+                'QuizService',
+                `Failed to upload images for question ${i + 1}`,
+                uploadError.message,
+              );
+              throw new BadRequestException(
+                `Question ${i + 1}: Gagal upload gambar - ${uploadError.message}`,
+              );
+            }
+          }
+          // Fallback to single image upload (backward compatibility)
+          else if (questionData.imageBase64) {
+            try {
+              const imgSequence = questionData.imageSequence || 1;
+
+              // Check if this is new base64 data
+              const isBase64 = questionData.imageBase64.startsWith('data:');
+
+              if (isBase64) {
+                // Upload new image to storage
+                const fileInfo = await this.fileUploadService.uploadFromBase64(
+                  questionData.imageBase64,
+                  questionData.imageOriginalName || 'question_image.jpg',
+                  `question/${savedQuestion.id}`,
+                );
+
+                // Create new image record
+                const imageRecord = this.quizImageRepository.create({
+                  questionId: savedQuestion.id,
+                  sequence: imgSequence,
+                  fileName: fileInfo.fileName,
+                  originalName: fileInfo.originalName,
+                  mimeType: fileInfo.mimeType,
+                  fileSize: fileInfo.fileSize,
+                  altText: questionData.imageAltText,
+                  isActive: true,
+                });
+
+                await this.quizImageRepository.save(imageRecord);
+                DebugLogger.debug(
+                  'QuizService',
+                  `Created single image for question ${i + 1}`,
+                );
+              }
+            } catch (uploadError) {
+              DebugLogger.error(
+                'QuizService',
+                `Failed to upload single image for question ${i + 1}`,
+                uploadError.message,
+              );
+              throw new BadRequestException(
+                `Question ${i + 1}: Gagal upload gambar - ${uploadError.message}`,
+              );
+            }
+          }
 
           savedQuestions.push(savedQuestion);
         }
@@ -589,25 +748,14 @@ export class QuizService {
           incomingIds.length > 0 &&
           !incomingIds.includes(existingQuestion.id)
         ) {
-          // Delete images from R2 first
+          // Delete images - check if still in use first
           const images = await this.quizImageRepository.find({
             where: { questionId: existingQuestion.id },
           });
 
           for (const image of images) {
-            try {
-              await this.r2StorageService.deleteFile(image.fileName);
-              DebugLogger.debug(
-                'QuizService',
-                `Deleted image from R2: ${image.fileName}`,
-              );
-            } catch (error) {
-              DebugLogger.error(
-                'QuizService',
-                `Failed to delete image ${image.fileName}`,
-                error.message,
-              );
-            }
+            // Safe delete - only delete from R2 if no other question uses this file
+            await this.safeDeleteImageFile(image.fileName, image.id);
           }
 
           await this.quizImageRepository.delete({
@@ -725,23 +873,12 @@ export class QuizService {
                   imgData.imageBase64.startsWith('data:');
 
                 if (isBase64) {
-                  // Delete old image file from R2 if updating
+                  // Delete old image file from R2 if updating (safe delete)
                   if (existingImage) {
-                    try {
-                      await this.r2StorageService.deleteFile(
-                        existingImage.fileName,
-                      );
-                      DebugLogger.debug(
-                        'QuizService',
-                        `Deleted old image for update: ${existingImage.fileName}`,
-                      );
-                    } catch (error) {
-                      DebugLogger.error(
-                        'QuizService',
-                        'Failed to delete old image',
-                        error.message,
-                      );
-                    }
+                    await this.safeDeleteImageFile(
+                      existingImage.fileName,
+                      existingImage.id,
+                    );
                   }
 
                   // Upload new image to storage
@@ -841,23 +978,12 @@ export class QuizService {
               const isBase64 = questionData.imageBase64.startsWith('data:');
 
               if (isBase64) {
-                // Delete old image file from R2 if updating
+                // Delete old image file from R2 if updating (safe delete)
                 if (existingImage) {
-                  try {
-                    await this.r2StorageService.deleteFile(
-                      existingImage.fileName,
-                    );
-                    DebugLogger.debug(
-                      'QuizService',
-                      `Deleted old single image: ${existingImage.fileName}`,
-                    );
-                  } catch (error) {
-                    DebugLogger.error(
-                      'QuizService',
-                      'Failed to delete old image',
-                      error.message,
-                    );
-                  }
+                  await this.safeDeleteImageFile(
+                    existingImage.fileName,
+                    existingImage.id,
+                  );
                 }
 
                 // Upload new image to storage
@@ -1079,7 +1205,7 @@ export class QuizService {
       );
     }
 
-    // Delete all images from storage for all questions in this quiz
+    // Delete all images - check if still in use by other questions first
     if (quiz.questions && quiz.questions.length > 0) {
       for (const question of quiz.questions) {
         const images = await this.quizImageRepository.find({
@@ -1087,19 +1213,8 @@ export class QuizService {
         });
 
         for (const image of images) {
-          try {
-            await this.fileUploadService.deleteImage(image.fileName);
-            DebugLogger.debug(
-              'QuizService',
-              `Deleted image from storage: ${image.fileName}`,
-            );
-          } catch (error) {
-            DebugLogger.error(
-              'QuizService',
-              `Failed to delete image from storage: ${image.fileName}`,
-              error.message,
-            );
-          }
+          // Safe delete - only delete from R2 if no other question uses this file
+          await this.safeDeleteImageFile(image.fileName, image.id);
         }
       }
     }
@@ -1425,5 +1540,213 @@ export class QuizService {
       items: enhancedQuizzes,
       pagination: quizData.pagination,
     };
+  }
+
+  async copyQuizWithImages(
+    templateId: number,
+    newTitle: string,
+    newLocationKey?: string,
+    newServiceKey?: string,
+    userInfo?: UserInfo,
+  ): Promise<any> {
+    try {
+      // Load template quiz dengan semua relasi
+      const templateQuiz = await this.quizRepository.findOne({
+        where: { id: templateId },
+        relations: ['questions', 'scoringTemplates'],
+      });
+
+      if (!templateQuiz) {
+        throw new NotFoundException('Template quiz tidak ditemukan');
+      }
+
+      // Generate slug dan token untuk quiz baru
+      const slug = generateSlug(newTitle);
+      const token = generateToken();
+
+      // Create quiz baru dari template
+      const newQuiz = this.quizRepository.create({
+        title: newTitle,
+        description: templateQuiz.description,
+        slug,
+        token,
+        locationKey: newLocationKey ?? templateQuiz.locationKey, // Use new location or fallback to template
+        serviceKey: newServiceKey ?? templateQuiz.serviceKey, // Use new service or fallback to template
+        passingScore: templateQuiz.passingScore,
+        questionsPerPage: templateQuiz.questionsPerPage,
+        durationMinutes: templateQuiz.durationMinutes,
+        isActive: true,
+        isPublished: false,
+        startDateTime: null,
+        endDateTime: null,
+        quizLink: null,
+        createdBy: userInfo?.email || userInfo?.name || 'system',
+        updatedBy: userInfo?.email || userInfo?.name || 'system',
+      });
+
+      const savedQuiz = await this.quizRepository.save(newQuiz);
+
+      // Generate URLs untuk quiz baru
+      if (savedQuiz.slug && savedQuiz.token) {
+        const urls = await this.urlGeneratorService.generateQuizUrls(
+          savedQuiz.slug,
+          savedQuiz.token,
+          savedQuiz.id,
+        );
+        await this.quizRepository.update(savedQuiz.id, {
+          normalUrl: urls.normalUrl,
+          shortUrl: urls.shortUrl,
+        });
+        savedQuiz.normalUrl = urls.normalUrl;
+        savedQuiz.shortUrl = urls.shortUrl;
+      }
+
+      // Copy scoring templates
+      const newScoringTemplates = [];
+      if (templateQuiz.scoringTemplates && templateQuiz.scoringTemplates.length > 0) {
+        for (const template of templateQuiz.scoringTemplates) {
+          const newTemplate = this.quizScoringRepository.create({
+            quizId: savedQuiz.id,
+            correctAnswers: template.correctAnswers,
+            points: template.points,
+            isActive: template.isActive,
+            createdBy: userInfo?.email || userInfo?.name || 'system',
+            updatedBy: userInfo?.email || userInfo?.name || 'system',
+          });
+          const savedTemplate = await this.quizScoringRepository.save(newTemplate);
+          newScoringTemplates.push(savedTemplate);
+        }
+      }
+
+      // Copy questions dan images
+      const newQuestions = [];
+      if (templateQuiz.questions && templateQuiz.questions.length > 0) {
+        for (let i = 0; i < templateQuiz.questions.length; i++) {
+          const templateQuestion = templateQuiz.questions[i];
+
+          // Create question baru
+          const newQuestion = this.questionRepository.create({
+            quizId: savedQuiz.id,
+            questionText: templateQuestion.questionText,
+            questionType: templateQuestion.questionType,
+            options: templateQuestion.options,
+            correctAnswer: templateQuestion.correctAnswer,
+            order: templateQuestion.order,
+          });
+
+          const savedQuestion = await this.questionRepository.save(newQuestion);
+
+          // Load images dari template question
+          const templateImages = await this.quizImageRepository.find({
+            where: { questionId: templateQuestion.id, isActive: true },
+            order: { sequence: 'ASC' },
+          });
+
+          // Copy images - reuse same file (share image) instead of duplicating
+          if (templateImages && templateImages.length > 0) {
+            for (const templateImage of templateImages) {
+              try {
+                // Create image record baru yang merujuk ke file yang sama
+                // Ini lebih efisien daripada copy file - save storage & lebih cepat
+                const newImage = this.quizImageRepository.create({
+                  questionId: savedQuestion.id,
+                  sequence: templateImage.sequence,
+                  fileName: templateImage.fileName, // Reuse file yang sama
+                  originalName: templateImage.originalName,
+                  mimeType: templateImage.mimeType,
+                  fileSize: templateImage.fileSize,
+                  altText: templateImage.altText,
+                  isActive: true,
+                });
+
+                await this.quizImageRepository.save(newImage);
+                DebugLogger.debug(
+                  'QuizService',
+                  `Reused image ${templateImage.fileName} for question ${i + 1}, sequence ${templateImage.sequence}`,
+                );
+              } catch (error) {
+                DebugLogger.error(
+                  'QuizService',
+                  `Failed to create image record for question ${i + 1}`,
+                  error.message,
+                );
+                // Continue dengan question lain jika ada error
+              }
+            }
+          }
+
+          newQuestions.push(savedQuestion);
+        }
+      }
+
+      // Auto-assign admin users berdasarkan service dan location
+      if (savedQuiz.serviceKey || savedQuiz.locationKey) {
+        await this.autoAssignmentService.autoAssignUsersToQuiz(
+          savedQuiz.id,
+          savedQuiz.serviceKey,
+          savedQuiz.locationKey,
+          'system',
+        );
+      }
+
+      // Get auto-assigned users
+      const users = await this.userQuizAssignmentRepository.find({
+        where: { quizId: savedQuiz.id, isActive: true },
+        relations: ['user'],
+      });
+
+      const assignedUsers = users.map((assignment) => ({
+        id: assignment.user.id,
+        name: assignment.user.name,
+        email: assignment.user.email,
+        role: assignment.user.role,
+        assignedAt: assignment.createdAt,
+        assignmentType: assignment.assignedBy === 'system' ? 'auto' : 'manual',
+        isActive: assignment.isActive,
+      }));
+
+      // Load images for each question in response
+      const questionsWithImages = await Promise.all(
+        newQuestions.map(async (question) => {
+          const images = await this.quizImageRepository.find({
+            where: { questionId: question.id, isActive: true },
+            order: { sequence: 'ASC' },
+          });
+          return {
+            ...question,
+            images: images.map((img) => ({
+              id: img.id,
+              sequence: img.sequence,
+              fileName: img.fileName,
+              originalName: img.originalName,
+              mimeType: img.mimeType,
+              fileSize: img.fileSize,
+              altText: img.altText,
+              downloadUrl: `/api/files/${img.fileName}`,
+            })),
+          };
+        }),
+      );
+
+      return {
+        success: true,
+        message: 'Quiz berhasil dicopy dengan semua gambar',
+        data: {
+          ...savedQuiz,
+          questions: questionsWithImages,
+          scoringTemplates: newScoringTemplates,
+          assignedUsers,
+          copiedFrom: {
+            id: templateQuiz.id,
+            title: templateQuiz.title,
+          },
+        },
+      };
+    } catch (error) {
+      DebugLogger.error('QuizService', 'Copy quiz error', error.message);
+      throw new BadRequestException(
+        `Gagal copy quiz: ${error.message}`,
+      );
+    }
   }
 }

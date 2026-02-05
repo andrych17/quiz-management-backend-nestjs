@@ -13,7 +13,7 @@ export class UrlGeneratorService {
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     this.tinyUrlApiToken = this.configService.get<string>('TINYURL_API_TOKEN');
     this.enableTinyUrl =
-      this.configService.get<boolean>('ENABLE_TINYURL') !== false;
+      this.configService.get<string>('ENABLE_TINYURL') === 'true';
   }
 
   /**

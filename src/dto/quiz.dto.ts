@@ -61,6 +61,47 @@ export class CreateQuestionForQuizDto {
   @IsOptional()
   @IsNumber()
   order?: number;
+
+  @ApiPropertyOptional({
+    description: 'Base64 encoded image for the question',
+  })
+  @IsOptional()
+  @IsString()
+  imageBase64?: string;
+
+  @ApiPropertyOptional({
+    description: 'Original filename of the uploaded image',
+  })
+  @IsOptional()
+  @IsString()
+  imageOriginalName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alt text for the image',
+  })
+  @IsOptional()
+  @IsString()
+  imageAltText?: string;
+
+  @ApiPropertyOptional({
+    description: 'Sequence number for single image',
+  })
+  @IsOptional()
+  @IsNumber()
+  imageSequence?: number;
+
+  @ApiPropertyOptional({
+    description: 'Array of multiple images for the question',
+    type: 'array',
+  })
+  @IsOptional()
+  @IsArray()
+  imagesBase64?: Array<{
+    imageBase64: string;
+    originalName?: string;
+    altText?: string;
+    sequence?: number;
+  }>;
 }
 
 export class CreateScoringTemplateForQuizDto {

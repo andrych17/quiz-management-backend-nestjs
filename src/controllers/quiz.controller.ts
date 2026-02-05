@@ -136,8 +136,8 @@ export class QuizController {
             'Mengembalikan data quiz dengan serviceKey dan locationKey',
           'GET /api/quizzes/quiz-templates':
             'Mengembalikan daftar template quiz yang bisa dicopy',
-          'POST /api/quizzes/copy-template/:id':
-            'Copy template quiz menjadi quiz baru',
+          'POST /api/quizzes/:id/copy':
+            'Copy quiz menjadi quiz baru lengkap dengan gambar',
           'GET /api/config/ui-mappings':
             'Mengembalikan mapping objects untuk manual mapping',
         },
@@ -180,6 +180,50 @@ export class QuizController {
       },
       'Panduan filtering dan mapping berhasil diambil',
     );
+  }
+
+  @Post(':id/copy')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Copy quiz as template',
+    description:
+      'Copy quiz lengkap dengan questions, images, dan scoring templates. Gambar akan di-download dari template dan di-upload ulang untuk quiz baru.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Template quiz ID' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Quiz berhasil dicopy dengan semua gambar',
+    type: QuizDetailResponseDto,
+  })
+  async copyQuiz(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { title: string; locationKey?: string; serviceKey?: string },
+    @Req() req: any,
+  ): Promise<StdApiResponse<any>> {
+    const userInfo = {
+      id: req.user?.id,
+      email: req.user?.email,
+      name: req.user?.name,
+      role: req.user?.role,
+    };
+
+    const result = await this.quizService.copyQuizWithImages(
+      id,
+      body.title,
+      body.locationKey,
+      body.serviceKey,
+      userInfo,
+    );
+
+    return {
+      success: result.success,
+      message: result.message,
+      data: result.data,
+      timestamp: new Date().toISOString(),
+      statusCode: HttpStatus.CREATED,
+    };
   }
 
   @Get(':id/questions')
