@@ -353,6 +353,70 @@ export class ConfigService {
     });
   }
 
+  /**
+   * Get locations based on user's assigned permissions
+   */
+  async getLocationsForUser(userId: number, userRole: string): Promise<ConfigItem[]> {
+    // Superadmin sees all locations
+    if (userRole === 'superadmin') {
+      return this.getLocations();
+    }
+
+    // Get user info
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const allLocations = await this.getLocations();
+
+    // Filter locations based on user's locationKey
+    if (
+      user.locationKey &&
+      user.locationKey !== 'all_locations' &&
+      !user.locationKey.startsWith('all_')
+    ) {
+      // User has specific location - only show that location
+      return allLocations.filter((loc) => loc.key === user.locationKey);
+    }
+
+    // User has all_locations or null - show all locations
+    return allLocations;
+  }
+
+  /**
+   * Get services based on user's assigned permissions
+   */
+  async getServicesForUser(userId: number, userRole: string): Promise<ConfigItem[]> {
+    // Superadmin sees all services
+    if (userRole === 'superadmin') {
+      return this.getServices();
+    }
+
+    // Get user info
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const allServices = await this.getServices();
+
+    // Filter services based on user's serviceKey
+    if (
+      user.serviceKey &&
+      user.serviceKey !== 'all_services' &&
+      !user.serviceKey.startsWith('all_')
+    ) {
+      // User has specific service - only show that service
+      return allServices.filter((svc) => svc.key === user.serviceKey);
+    }
+
+    // User has all_services or null - show all services
+    return allServices;
+  }
+
   async getServicesForPublicUser(): Promise<ConfigItem[]> {
     return this.configItemRepository.find({
       where: {

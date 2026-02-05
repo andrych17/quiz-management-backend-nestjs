@@ -526,6 +526,39 @@ export class QuizService {
         .andWhere('userAssignments.isActive = :isAssignmentActive', {
           isAssignmentActive: true,
         });
+      
+      // Additional filtering based on admin's service and location
+      // Quiz must match admin's service OR have "all_services"
+      if (
+        user?.serviceKey &&
+        user.serviceKey !== 'all_services' &&
+        !user.serviceKey.startsWith('all_')
+      ) {
+        queryBuilder.andWhere(
+          '(quiz.serviceKey = :userServiceKey OR quiz.serviceKey = :allServicesKey OR quiz.serviceKey LIKE :allServicesPattern)',
+          {
+            userServiceKey: user.serviceKey,
+            allServicesKey: 'all_services',
+            allServicesPattern: 'all_%',
+          },
+        );
+      }
+      
+      // Quiz must match admin's location OR have "all_locations"
+      if (
+        user?.locationKey &&
+        user.locationKey !== 'all_locations' &&
+        !user.locationKey.startsWith('all_')
+      ) {
+        queryBuilder.andWhere(
+          '(quiz.locationKey = :userLocationKey OR quiz.locationKey = :allLocationsKey OR quiz.locationKey LIKE :allLocationsPattern)',
+          {
+            userLocationKey: user.locationKey,
+            allLocationsKey: 'all_locations',
+            allLocationsPattern: 'all_%',
+          },
+        );
+      }
     }
     // Regular users see published and active quizzes only
     else {
@@ -534,24 +567,37 @@ export class QuizService {
         .andWhere('quiz.isActive = :isActiveQuiz', { isActiveQuiz: true });
 
       // For regular users, apply user's service and location restrictions
+      // Both service AND location must match (unless one side is "all")
       // Skip filtering if user has "all_services" or "all_locations" (or any "all_*" value)
       if (
         user?.serviceKey &&
         user.serviceKey !== 'all_services' &&
         !user.serviceKey.startsWith('all_')
       ) {
-        queryBuilder.andWhere('quiz.serviceKey = :userServiceKey', {
-          userServiceKey: user.serviceKey,
-        });
+        // Quiz must either match user's service OR have "all_services"
+        queryBuilder.andWhere(
+          '(quiz.serviceKey = :userServiceKey OR quiz.serviceKey = :allServicesKey OR quiz.serviceKey LIKE :allServicesPattern)',
+          {
+            userServiceKey: user.serviceKey,
+            allServicesKey: 'all_services',
+            allServicesPattern: 'all_%',
+          },
+        );
       }
       if (
         user?.locationKey &&
         user.locationKey !== 'all_locations' &&
         !user.locationKey.startsWith('all_')
       ) {
-        queryBuilder.andWhere('quiz.locationKey = :userLocationKey', {
-          userLocationKey: user.locationKey,
-        });
+        // Quiz must either match user's location OR have "all_locations"
+        queryBuilder.andWhere(
+          '(quiz.locationKey = :userLocationKey OR quiz.locationKey = :allLocationsKey OR quiz.locationKey LIKE :allLocationsPattern)',
+          {
+            userLocationKey: user.locationKey,
+            allLocationsKey: 'all_locations',
+            allLocationsPattern: 'all_%',
+          },
+        );
       }
     }
 

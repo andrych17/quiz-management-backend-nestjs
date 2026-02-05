@@ -23,6 +23,7 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 import { AttemptService } from '../services/attempt.service';
 import { AttemptResponseDto } from '../dto/attempt.dto';
 import { DebugLogger } from '../lib/debug-logger';
+import { CurrentUser, CurrentUserData } from '../decorators/current-user.decorator';
 
 @ApiTags('attempts')
 @Controller('api/attempts')
@@ -73,6 +74,7 @@ export class AttemptController {
     type: [AttemptResponseDto],
   })
   async findAll(
+    @CurrentUser() user: CurrentUserData,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 25,
     @Query('search') search?: string,
@@ -115,6 +117,8 @@ export class AttemptController {
       endDate,
       submissionStatus,
       passStatus,
+      user.id,
+      user.role,
     );
   }
 
@@ -179,6 +183,7 @@ export class AttemptController {
     description: 'Quiz attempts exported to Excel successfully',
   })
   async exportAttemptsToExcel(
+    @CurrentUser() user: CurrentUserData,
     @Query('quizId', new ParseIntPipe({ optional: true })) quizId?: number,
     @Query('serviceKey') serviceKey?: string,
     @Query('locationKey') locationKey?: string,
@@ -205,6 +210,8 @@ export class AttemptController {
       locationKey,
       submissionStatus,
       passStatus,
+      user.id,
+      user.role,
     );
 
     const filename = `quiz-attempts-${new Date().toISOString().split('T')[0]}.xlsx`;

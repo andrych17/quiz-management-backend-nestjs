@@ -10,7 +10,6 @@ import {
   ParseIntPipe,
   HttpStatus,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -34,6 +33,7 @@ import {
   ApiResponse as StdApiResponse,
   ResponseFactory,
 } from '../interfaces/api-response.interface';
+import { CurrentUser, CurrentUserData } from '../decorators/current-user.decorator';
 
 @ApiTags('quizzes')
 @Controller('api/quizzes')
@@ -55,13 +55,13 @@ export class QuizController {
   })
   async create(
     @Body() createQuizDto: CreateQuizDto,
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<StdApiResponse<any>> {
     const userInfo = {
-      id: req.user?.id,
-      email: req.user?.email,
-      name: req.user?.name,
-      role: req.user?.role,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     };
     const result = await this.quizService.create(createQuizDto, userInfo);
 
@@ -200,13 +200,13 @@ export class QuizController {
   async copyQuiz(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { title: string; locationKey?: string; serviceKey?: string },
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<StdApiResponse<any>> {
     const userInfo = {
-      id: req.user?.id,
-      email: req.user?.email,
-      name: req.user?.name,
-      role: req.user?.role,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     };
 
     const result = await this.quizService.copyQuizWithImages(
@@ -288,7 +288,7 @@ export class QuizController {
   })
   async generateLink(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
     @Query('alias') alias?: string,
   ): Promise<
     StdApiResponse<{
@@ -297,10 +297,10 @@ export class QuizController {
     }>
   > {
     const userInfo = {
-      id: req.user?.id,
-      email: req.user?.email,
-      name: req.user?.name,
-      role: req.user?.role,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     };
     // Generate URLs and publish quiz, pass alias if provided
     const urls = await this.quizService.generateLink(id, alias, userInfo);
@@ -466,13 +466,13 @@ export class QuizController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateQuizDto: UpdateQuizDto,
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<StdApiResponse<QuizResponseDto>> {
     const userInfo = {
-      id: req.user?.id,
-      email: req.user?.email,
-      name: req.user?.name,
-      role: req.user?.role,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     };
     const result = await this.quizService.update(id, updateQuizDto, userInfo);
     return ResponseFactory.success(result, 'Quiz updated successfully');
@@ -556,7 +556,7 @@ export class QuizController {
     type: [QuizResponseDto],
   })
   async findAll(
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
@@ -566,7 +566,6 @@ export class QuizController {
     @Query('sortBy') sortBy: string = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
-    const user = req.user;
     return this.quizService.findAllForUserWithDisplayNames(
       user.id,
       user.role,

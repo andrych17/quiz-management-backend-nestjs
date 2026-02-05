@@ -10,7 +10,6 @@ import {
   ParseIntPipe,
   HttpStatus,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -33,6 +32,7 @@ import {
   ApiResponse as StdApiResponse,
   ResponseFactory,
 } from '../interfaces/api-response.interface';
+import { CurrentUser, CurrentUserData } from '../decorators/current-user.decorator';
 
 @ApiTags('users')
 @Controller('api/users')
@@ -52,13 +52,13 @@ export class UserController {
   })
   async create(
     @Body() createUserDto: CreateUserDto,
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<StdApiResponse<any>> {
     const userInfo = {
-      id: req.user?.id,
-      email: req.user?.email,
-      name: req.user?.name,
-      role: req.user?.role,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     };
     const result = await this.userService.create(createUserDto, userInfo);
 
@@ -192,13 +192,13 @@ export class UserController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<StdApiResponse<UserDetailResponseDto>> {
     const userInfo = {
-      id: req.user?.id,
-      email: req.user?.email,
-      name: req.user?.name,
-      role: req.user?.role,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     };
     const result = await this.userService.update(id, updateUserDto, userInfo);
     return ResponseFactory.success(result, 'User updated successfully');

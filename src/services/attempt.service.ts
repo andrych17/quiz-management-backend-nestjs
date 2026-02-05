@@ -10,6 +10,7 @@ import { Attempt } from '../entities/attempt.entity';
 import { AttemptAnswer } from '../entities/attempt-answer.entity';
 import { Quiz } from '../entities/quiz.entity';
 import { Question } from '../entities/question.entity';
+import { User } from '../entities/user.entity';
 import {
   CreateAttemptDto,
   UpdateAttemptDto,
@@ -33,6 +34,8 @@ export class AttemptService {
     private quizRepository: Repository<Quiz>,
     @InjectRepository(Question)
     private questionRepository: Repository<Question>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     private readonly configService: ConfigService,
     private dataSource: DataSource,
   ) {}
@@ -487,6 +490,8 @@ export class AttemptService {
     locationKey?: string,
     submissionStatus?: string,
     passStatus?: string,
+    userId?: number,
+    userRole?: string,
   ): Promise<Buffer> {
     DebugLogger.service('AttemptService', 'exportAttemptsToExcel', {
       quizId,
@@ -494,12 +499,52 @@ export class AttemptService {
       locationKey,
       submissionStatus,
       passStatus,
+      userId,
+      userRole,
     });
+
+    // Get user info for filtering (if admin, not superadmin)
+    const user = userId ? await this.userRepository.findOne({ where: { id: userId } }) : null;
 
     // Build query with filters
     const queryBuilder = this.attemptRepository
       .createQueryBuilder('attempt')
       .leftJoinAndSelect('attempt.quiz', 'quiz');
+
+    // Apply user-based filtering for admin (not superadmin)
+    if (userRole === 'admin' && user) {
+      // Filter by service - quiz must match user's service OR have "all_services"
+      if (
+        user.serviceKey &&
+        user.serviceKey !== 'all_services' &&
+        !user.serviceKey.startsWith('all_')
+      ) {
+        queryBuilder.andWhere(
+          '(quiz.serviceKey = :userServiceKey OR quiz.serviceKey = :allServicesKey OR quiz.serviceKey LIKE :allServicesPattern)',
+          {
+            userServiceKey: user.serviceKey,
+            allServicesKey: 'all_services',
+            allServicesPattern: 'all_%',
+          },
+        );
+      }
+      
+      // Filter by location - quiz must match user's location OR have "all_locations"
+      if (
+        user.locationKey &&
+        user.locationKey !== 'all_locations' &&
+        !user.locationKey.startsWith('all_')
+      ) {
+        queryBuilder.andWhere(
+          '(quiz.locationKey = :userLocationKey OR quiz.locationKey = :allLocationsKey OR quiz.locationKey LIKE :allLocationsPattern)',
+          {
+            userLocationKey: user.locationKey,
+            allLocationsKey: 'all_locations',
+            allLocationsPattern: 'all_%',
+          },
+        );
+      }
+    }
 
     if (quizId) {
       queryBuilder.andWhere('attempt.quizId = :quizId', { quizId });
@@ -510,7 +555,14 @@ export class AttemptService {
       serviceKey !== 'all_services' &&
       !serviceKey.startsWith('all_')
     ) {
-      queryBuilder.andWhere('quiz.serviceKey = :serviceKey', { serviceKey });
+      queryBuilder.andWhere(
+        '(quiz.serviceKey = :serviceKey OR quiz.serviceKey = :allServicesKey OR quiz.serviceKey LIKE :allServicesPattern)',
+        {
+          serviceKey,
+          allServicesKey: 'all_services',
+          allServicesPattern: 'all_%',
+        },
+      );
     }
 
     if (
@@ -518,7 +570,14 @@ export class AttemptService {
       locationKey !== 'all_locations' &&
       !locationKey.startsWith('all_')
     ) {
-      queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
+      queryBuilder.andWhere(
+        '(quiz.locationKey = :locationKey OR quiz.locationKey = :allLocationsKey OR quiz.locationKey LIKE :allLocationsPattern)',
+        {
+          locationKey,
+          allLocationsKey: 'all_locations',
+          allLocationsPattern: 'all_%',
+        },
+      );
     }
 
     // Filter by submission status
@@ -722,13 +781,53 @@ export class AttemptService {
     endDate?: string,
     submissionStatus?: string,
     passStatus?: string,
+    userId?: number,
+    userRole?: string,
   ) {
     const skip = (page - 1) * limit;
+
+    // Get user info for filtering (if admin, not superadmin)
+    const user = userId ? await this.userRepository.findOne({ where: { id: userId } }) : null;
 
     // Build query - simplified tanpa leftJoinAndSelect answers
     const queryBuilder = this.attemptRepository
       .createQueryBuilder('attempt')
       .leftJoinAndSelect('attempt.quiz', 'quiz');
+
+    // Apply user-based filtering for admin (not superadmin)
+    if (userRole === 'admin' && user) {
+      // Filter by service - quiz must match user's service OR have "all_services"
+      if (
+        user.serviceKey &&
+        user.serviceKey !== 'all_services' &&
+        !user.serviceKey.startsWith('all_')
+      ) {
+        queryBuilder.andWhere(
+          '(quiz.serviceKey = :userServiceKey OR quiz.serviceKey = :allServicesKey OR quiz.serviceKey LIKE :allServicesPattern)',
+          {
+            userServiceKey: user.serviceKey,
+            allServicesKey: 'all_services',
+            allServicesPattern: 'all_%',
+          },
+        );
+      }
+      
+      // Filter by location - quiz must match user's location OR have "all_locations"
+      if (
+        user.locationKey &&
+        user.locationKey !== 'all_locations' &&
+        !user.locationKey.startsWith('all_')
+      ) {
+        queryBuilder.andWhere(
+          '(quiz.locationKey = :userLocationKey OR quiz.locationKey = :allLocationsKey OR quiz.locationKey LIKE :allLocationsPattern)',
+          {
+            userLocationKey: user.locationKey,
+            allLocationsKey: 'all_locations',
+            allLocationsPattern: 'all_%',
+          },
+        );
+      }
+    }
 
     // Filter by quiz ID if specified
     if (quizId) {
@@ -742,22 +841,36 @@ export class AttemptService {
       });
     }
 
-    // Filter by service
+    // Filter by service (additional filter on top of user-based filtering)
     if (
       serviceKey &&
       serviceKey !== 'all_services' &&
       !serviceKey.startsWith('all_')
     ) {
-      queryBuilder.andWhere('quiz.serviceKey = :serviceKey', { serviceKey });
+      queryBuilder.andWhere(
+        '(quiz.serviceKey = :serviceKey OR quiz.serviceKey = :allServicesKey OR quiz.serviceKey LIKE :allServicesPattern)',
+        {
+          serviceKey,
+          allServicesKey: 'all_services',
+          allServicesPattern: 'all_%',
+        },
+      );
     }
 
-    // Filter by location
+    // Filter by location (additional filter on top of user-based filtering)
     if (
       locationKey &&
       locationKey !== 'all_locations' &&
       !locationKey.startsWith('all_')
     ) {
-      queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
+      queryBuilder.andWhere(
+        '(quiz.locationKey = :locationKey OR quiz.locationKey = :allLocationsKey OR quiz.locationKey LIKE :allLocationsPattern)',
+        {
+          locationKey,
+          allLocationsKey: 'all_locations',
+          allLocationsPattern: 'all_%',
+        },
+      );
     }
 
     // Search by participant name, email, or quiz title

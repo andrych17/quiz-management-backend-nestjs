@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { DashboardService } from '../services/dashboard.service';
 import { DebugLogger } from '../lib/debug-logger';
+import { CurrentUser, CurrentUserData } from '../decorators/current-user.decorator';
 
 @ApiTags('dashboard')
 @Controller('api/dashboard')
@@ -68,9 +69,12 @@ export class DashboardController {
       },
     },
   })
-  async getDashboardStats() {
+  async getDashboardStats(@CurrentUser() user: CurrentUserData) {
     DebugLogger.endpoint('GET', '/api/dashboard/stats');
-    return await this.dashboardService.getDashboardStats();
+    return await this.dashboardService.getDashboardStats(
+      user.id,
+      user.role,
+    );
   }
 
   @Get('recent-activity')
@@ -109,6 +113,7 @@ export class DashboardController {
     },
   })
   async getRecentActivity(
+    @CurrentUser() user: CurrentUserData,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     DebugLogger.endpoint(
@@ -117,6 +122,10 @@ export class DashboardController {
       {},
       { limit: limit || 50 },
     );
-    return await this.dashboardService.getRecentActivity(limit || 50);
+    return await this.dashboardService.getRecentActivity(
+      limit || 50,
+      user.id,
+      user.role,
+    );
   }
 }

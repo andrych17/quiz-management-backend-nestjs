@@ -10,7 +10,6 @@ import {
   ParseIntPipe,
   HttpStatus,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -32,6 +31,7 @@ import {
   ApiResponse as StdApiResponse,
   ResponseFactory,
 } from '../interfaces/api-response.interface';
+import { CurrentUser, CurrentUserData } from '../decorators/current-user.decorator';
 
 @ApiTags('config')
 @Controller('api/config')
@@ -50,13 +50,13 @@ export class ConfigController {
   })
   async create(
     @Body() createConfigItemDto: CreateConfigItemDto,
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<StdApiResponse<any>> {
     const userInfo = {
-      id: req.user?.id,
-      email: req.user?.email,
-      name: req.user?.name,
-      role: req.user?.role,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     };
     const result = await this.configService.create(
       createConfigItemDto,
@@ -99,9 +99,9 @@ export class ConfigController {
     status: HttpStatus.OK,
     description: 'Filter options retrieved successfully',
   })
-  async getFilterOptions(@Req() req): Promise<StdApiResponse<any>> {
-    const userId = req.user.userId;
-    const userRole = req.user.role;
+  async getFilterOptions(@CurrentUser() user: CurrentUserData): Promise<StdApiResponse<any>> {
+    const userId = user.id;
+    const userRole = user.role;
 
     const filterOptions = await this.configService.getFilterOptionsForUser(
       userId,
@@ -157,14 +157,18 @@ export class ConfigController {
   }
 
   @Get('locations')
-  @ApiOperation({ summary: 'Get all location configuration items' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get location configuration items based on user permissions' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Location config items retrieved successfully',
     type: [ConfigItemResponseDto],
   })
-  async getLocations(): Promise<StdApiResponse<any>> {
-    const result = await this.configService.getLocations();
+  async getLocations(@CurrentUser() user: CurrentUserData): Promise<StdApiResponse<any>> {
+    const userId = user.id;
+    const userRole = user.role;
+    const result = await this.configService.getLocationsForUser(userId, userRole);
     return ResponseFactory.success(
       result,
       'Location config items retrieved successfully',
@@ -172,14 +176,18 @@ export class ConfigController {
   }
 
   @Get('services')
-  @ApiOperation({ summary: 'Get all service configuration items' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get service configuration items based on user permissions' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Service config items retrieved successfully',
     type: [ConfigItemResponseDto],
   })
-  async getServices(): Promise<StdApiResponse<any>> {
-    const result = await this.configService.getServices();
+  async getServices(@CurrentUser() user: CurrentUserData): Promise<StdApiResponse<any>> {
+    const userId = user.id;
+    const userRole = user.role;
+    const result = await this.configService.getServicesForUser(userId, userRole);
     return ResponseFactory.success(
       result,
       'Service config items retrieved successfully',
@@ -218,13 +226,13 @@ export class ConfigController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateConfigItemDto: UpdateConfigItemDto,
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<StdApiResponse<any>> {
     const userInfo = {
-      id: req.user?.id,
-      email: req.user?.email,
-      name: req.user?.name,
-      role: req.user?.role,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     };
     const result = await this.configService.update(
       id,
