@@ -30,6 +30,7 @@ import { AppService } from './app.service';
 import { QuizService } from './services/quiz.service';
 import { QuestionService } from './services/question.service';
 import { AttemptService } from './services/attempt.service';
+import { ConfigService as AppConfigService } from './services/config.service';
 import { UrlShortenerService } from './services/url-shortener.service';
 import { UserQuizAssignmentService } from './services/user-quiz-assignment.service';
 import { UrlGeneratorService } from './services/url-generator.service';
@@ -87,6 +88,7 @@ import { databaseConfig } from './config/database.config';
     QuizService,
     QuestionService,
     AttemptService,
+    AppConfigService,
     UrlShortenerService,
     UserQuizAssignmentService,
     UrlGeneratorService,

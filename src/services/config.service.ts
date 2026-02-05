@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { ConfigItem } from '../entities/config-item.entity';
+import { User } from '../entities/user.entity';
 import {
   CreateConfigItemDto,
   UpdateConfigItemDto,
@@ -30,6 +31,8 @@ export class ConfigService {
   constructor(
     @InjectRepository(ConfigItem)
     private configItemRepository: Repository<ConfigItem>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   async create(
@@ -393,6 +396,79 @@ export class ConfigService {
           description: item.description,
           order: item.order,
         })),
+      },
+    };
+  }
+
+  /**
+   * Get filter options (locations and services) based on user's assigned permissions
+   * Used for admin panel dropdowns
+   */
+  async getFilterOptionsForUser(
+    userId: number,
+    userRole: string,
+  ): Promise<any> {
+    // Superadmin sees all options
+    if (userRole === 'superadmin') {
+      return this.getMappings();
+    }
+
+    // Get user info
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const allMappings = await this.getMappings();
+
+    // Filter locations based on user's locationKey
+    let availableLocations = allMappings.locations.options;
+    if (
+      user.locationKey &&
+      user.locationKey !== 'all_locations' &&
+      !user.locationKey.startsWith('all_')
+    ) {
+      // User has specific location - only show that location
+      availableLocations = allMappings.locations.options.filter(
+        (loc) => loc.key === user.locationKey,
+      );
+    }
+    // else: user has all_locations or null - show all locations
+
+    // Filter services based on user's serviceKey
+    let availableServices = allMappings.services.options;
+    if (
+      user.serviceKey &&
+      user.serviceKey !== 'all_services' &&
+      !user.serviceKey.startsWith('all_')
+    ) {
+      // User has specific service - only show that service
+      availableServices = allMappings.services.options.filter(
+        (svc) => svc.key === user.serviceKey,
+      );
+    }
+    // else: user has all_services or null - show all services
+
+    // Rebuild mappings with filtered options
+    const locationMapping = availableLocations.reduce((acc, item) => {
+      acc[item.key] = item.value;
+      return acc;
+    }, {});
+
+    const serviceMapping = availableServices.reduce((acc, item) => {
+      acc[item.key] = item.value;
+      return acc;
+    }, {});
+
+    return {
+      locations: {
+        mapping: locationMapping,
+        options: availableLocations,
+      },
+      services: {
+        mapping: serviceMapping,
+        options: availableServices,
       },
     };
   }

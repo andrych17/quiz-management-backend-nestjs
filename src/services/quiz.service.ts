@@ -534,12 +534,21 @@ export class QuizService {
         .andWhere('quiz.isActive = :isActiveQuiz', { isActiveQuiz: true });
 
       // For regular users, apply user's service and location restrictions
-      if (user?.serviceKey) {
+      // Skip filtering if user has "all_services" or "all_locations" (or any "all_*" value)
+      if (
+        user?.serviceKey &&
+        user.serviceKey !== 'all_services' &&
+        !user.serviceKey.startsWith('all_')
+      ) {
         queryBuilder.andWhere('quiz.serviceKey = :userServiceKey', {
           userServiceKey: user.serviceKey,
         });
       }
-      if (user?.locationKey) {
+      if (
+        user?.locationKey &&
+        user.locationKey !== 'all_locations' &&
+        !user.locationKey.startsWith('all_')
+      ) {
         queryBuilder.andWhere('quiz.locationKey = :userLocationKey', {
           userLocationKey: user.locationKey,
         });

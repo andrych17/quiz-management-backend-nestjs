@@ -88,6 +88,31 @@ export class ConfigController {
     );
   }
 
+  @Get('filter-options')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Get filter options (locations and services) based on user permissions - for admin panel dropdowns',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Filter options retrieved successfully',
+  })
+  async getFilterOptions(@Req() req): Promise<StdApiResponse<any>> {
+    const userId = req.user.userId;
+    const userRole = req.user.role;
+
+    const filterOptions = await this.configService.getFilterOptionsForUser(
+      userId,
+      userRole,
+    );
+    return ResponseFactory.success(
+      filterOptions,
+      'Filter options retrieved successfully',
+    );
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all configuration items with pagination' })
   @ApiQuery({ name: 'page', required: false, type: Number })

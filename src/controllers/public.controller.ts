@@ -179,21 +179,14 @@ export class PublicController {
       );
     }
 
-    // Check if time expired
+    // Check if time expired (but still allow loading the quiz for submission)
+    let timeExpired = false;
     if (existingAttempt.endDateTime) {
       const now = new Date();
-      if (now > existingAttempt.endDateTime) {
-        return ResponseFactory.success(
-          {
-            timeExpired: true,
-            endDateTime: existingAttempt.endDateTime,
-          },
-          'Waktu pengerjaan quiz telah habis',
-        );
-      }
+      timeExpired = now > existingAttempt.endDateTime;
     }
 
-    // Return attempt data for resume
+    // Return attempt data for resume (including timeExpired flag for FE to handle)
     const result = {
       attemptId: existingAttempt.id,
       quizId: existingAttempt.quizId,
@@ -206,6 +199,7 @@ export class PublicController {
       endDateTime: existingAttempt.endDateTime,
       startedAt: existingAttempt.startedAt,
       answers: (existingAttempt as any).answers || [],
+      timeExpired: timeExpired, // Include flag for frontend to handle UI state
     };
 
     return ResponseFactory.success(
