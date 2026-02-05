@@ -40,6 +40,9 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new user' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -178,6 +181,9 @@ export class UserController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update user by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiResponse({
@@ -205,6 +211,9 @@ export class UserController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete user by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiResponse({

@@ -371,6 +371,11 @@ export class ConfigService {
 
     const allLocations = await this.getLocations();
 
+    // User without locationKey cannot see any locations
+    if (!user.locationKey) {
+      return [];
+    }
+
     // Filter locations based on user's locationKey
     if (
       user.locationKey &&
@@ -381,7 +386,7 @@ export class ConfigService {
       return allLocations.filter((loc) => loc.key === user.locationKey);
     }
 
-    // User has all_locations or null - show all locations
+    // User has all_locations - show all locations
     return allLocations;
   }
 
@@ -403,6 +408,11 @@ export class ConfigService {
 
     const allServices = await this.getServices();
 
+    // User without serviceKey cannot see any services
+    if (!user.serviceKey) {
+      return [];
+    }
+
     // Filter services based on user's serviceKey
     if (
       user.serviceKey &&
@@ -413,7 +423,7 @@ export class ConfigService {
       return allServices.filter((svc) => svc.key === user.serviceKey);
     }
 
-    // User has all_services or null - show all services
+    // User has all_services - show all services
     return allServices;
   }
 
@@ -487,32 +497,40 @@ export class ConfigService {
     const allMappings = await this.getMappings();
 
     // Filter locations based on user's locationKey
-    let availableLocations = allMappings.locations.options;
-    if (
-      user.locationKey &&
-      user.locationKey !== 'all_locations' &&
-      !user.locationKey.startsWith('all_')
-    ) {
-      // User has specific location - only show that location
-      availableLocations = allMappings.locations.options.filter(
-        (loc) => loc.key === user.locationKey,
-      );
+    let availableLocations = [];
+    if (user.locationKey) {
+      if (
+        user.locationKey === 'all_locations' ||
+        user.locationKey.startsWith('all_')
+      ) {
+        // User has all_locations - show all locations
+        availableLocations = allMappings.locations.options;
+      } else {
+        // User has specific location - only show that location
+        availableLocations = allMappings.locations.options.filter(
+          (loc) => loc.key === user.locationKey,
+        );
+      }
     }
-    // else: user has all_locations or null - show all locations
+    // else: user without locationKey - show no locations
 
     // Filter services based on user's serviceKey
-    let availableServices = allMappings.services.options;
-    if (
-      user.serviceKey &&
-      user.serviceKey !== 'all_services' &&
-      !user.serviceKey.startsWith('all_')
-    ) {
-      // User has specific service - only show that service
-      availableServices = allMappings.services.options.filter(
-        (svc) => svc.key === user.serviceKey,
-      );
+    let availableServices = [];
+    if (user.serviceKey) {
+      if (
+        user.serviceKey === 'all_services' ||
+        user.serviceKey.startsWith('all_')
+      ) {
+        // User has all_services - show all services
+        availableServices = allMappings.services.options;
+      } else {
+        // User has specific service - only show that service
+        availableServices = allMappings.services.options.filter(
+          (svc) => svc.key === user.serviceKey,
+        );
+      }
     }
-    // else: user has all_services or null - show all services
+    // else: user without serviceKey - show no services
 
     // Rebuild mappings with filtered options
     const locationMapping = availableLocations.reduce((acc, item) => {
