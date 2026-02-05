@@ -9,6 +9,7 @@ import {
   Query,
   ParseIntPipe,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,6 +17,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { QuestionService } from '../services/question.service';
 import {
@@ -28,6 +30,8 @@ import {
   ApiResponse as StdApiResponse,
   ResponseFactory,
 } from '../interfaces/api-response.interface';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard, Roles } from '../auth/roles.guard';
 
 @ApiTags('questions')
 @Controller('api/questions')
@@ -35,6 +39,9 @@ export class QuestionController {
   constructor(private readonly questionService: QuestionService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new question with images' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -48,6 +55,9 @@ export class QuestionController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin', 'user')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all questions with pagination' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -66,6 +76,9 @@ export class QuestionController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin', 'user')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get question by ID with images' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
@@ -80,6 +93,9 @@ export class QuestionController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update question by ID with images' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
@@ -95,6 +111,9 @@ export class QuestionController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete question by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
@@ -106,6 +125,9 @@ export class QuestionController {
   }
 
   @Put('quiz/:quizId/reorder')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Reorder questions in a quiz' })
   @ApiParam({ name: 'quizId', type: Number })
   @ApiResponse({
@@ -120,6 +142,9 @@ export class QuestionController {
   }
 
   @Delete(':questionId/images/:imageId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete specific image from a question' })
   @ApiParam({ name: 'questionId', type: Number, description: 'Question ID' })
   @ApiParam({

@@ -9,7 +9,6 @@ import {
   ParseIntPipe,
   HttpStatus,
   UseGuards,
-  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,6 +25,7 @@ import {
   ApiResponse as StdApiResponse,
   ResponseFactory,
 } from '../interfaces/api-response.interface';
+import { CurrentUser, CurrentUserData } from '../decorators/current-user.decorator';
 
 export class CreateUserQuizAssignmentDto {
   userId: number;
@@ -65,11 +65,11 @@ export class UserQuizAssignmentController {
   })
   async create(
     @Body() createDto: CreateUserQuizAssignmentDto,
-    @Request() req: any,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<StdApiResponse<UserQuizAssignmentResponseDto>> {
     const result = await this.userQuizAssignmentService.create(
       createDto,
-      req.user.username,
+      user.email,
     );
     return ResponseFactory.success(
       result,

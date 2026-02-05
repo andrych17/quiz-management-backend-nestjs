@@ -5,7 +5,6 @@ import {
   Put,
   Body,
   UseGuards,
-  Request,
   HttpStatus,
 } from '@nestjs/common';
 import {
@@ -30,6 +29,7 @@ import {
   ApiResponse as StdApiResponse,
   ResponseFactory,
 } from '../interfaces/api-response.interface';
+import { CurrentUser, CurrentUserData } from '../decorators/current-user.decorator';
 
 @ApiTags('authentication')
 @Controller('api/auth')
@@ -111,8 +111,8 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED,
     description: 'Unauthorized access',
   })
-  async getProfile(@Request() req: any): Promise<StdApiResponse<any>> {
-    const result = await this.authService.getProfile(req.user.id);
+  async getProfile(@CurrentUser() user: CurrentUserData): Promise<StdApiResponse<any>> {
+    const result = await this.authService.getProfile(user.id);
     return ResponseFactory.success(result, 'Profile retrieved successfully');
   }
 
@@ -134,11 +134,11 @@ export class AuthController {
     description: 'Unauthorized access',
   })
   async updateProfile(
-    @Request() req: any,
+    @CurrentUser() user: CurrentUserData,
     @Body() updateProfileDto: UpdateProfileDto,
   ): Promise<StdApiResponse<any>> {
     const result = await this.authService.updateProfile(
-      req.user.id,
+      user.id,
       updateProfileDto,
     );
     return ResponseFactory.success(result, 'Profile updated successfully');
@@ -161,11 +161,11 @@ export class AuthController {
     description: 'Unauthorized access',
   })
   async changePassword(
-    @Request() req: any,
+    @CurrentUser() user: CurrentUserData,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<StdApiResponse<any>> {
     const result = await this.authService.changePassword(
-      req.user.id,
+      user.id,
       changePasswordDto,
     );
     return ResponseFactory.success(result, 'Password changed successfully');
@@ -179,8 +179,8 @@ export class AuthController {
     status: HttpStatus.OK,
     description: 'Logout successful',
   })
-  async logout(@Request() req: any): Promise<StdApiResponse<any>> {
-    const result = await this.authService.logout(req.user.id);
+  async logout(@CurrentUser() user: CurrentUserData): Promise<StdApiResponse<any>> {
+    const result = await this.authService.logout(user.id);
     return ResponseFactory.success(result, 'Logout successful');
   }
 }

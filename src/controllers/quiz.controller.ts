@@ -227,6 +227,9 @@ export class QuizController {
   }
 
   @Get(':id/questions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin', 'user')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all questions for a quiz' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
@@ -244,6 +247,9 @@ export class QuizController {
   }
 
   @Get(':id/attempts')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all attempts for a quiz' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
@@ -431,6 +437,9 @@ export class QuizController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin', 'user')
+  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Get quiz by ID with complete details (questions, scoring, assigned users)',
