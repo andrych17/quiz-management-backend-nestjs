@@ -14,7 +14,6 @@ import { AttemptAnswer } from './attempt-answer.entity';
 
 @Entity('attempts')
 @Index(['quizId', 'email'], { unique: true }) // Prevent duplicate attempts from same email per quiz
-@Index(['quizId', 'nij'], { unique: true }) // Prevent duplicate attempts from same NIJ per quiz
 @Index(['quizId'])
 export class Attempt {
   @PrimaryGeneratedColumn()

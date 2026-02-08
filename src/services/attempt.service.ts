@@ -74,7 +74,7 @@ export class AttemptService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    // Check if participant already attempted this quiz (email and NIJ must be unique per quiz)
+    // Check if participant already attempted this quiz (email must be unique per quiz)
     const existingAttempt = await this.attemptRepository.findOne({
       where: {
         email: createAttemptDto.email,
@@ -90,20 +90,6 @@ export class AttemptService {
 
       // Allow resume - return existing attempt
       return this.findOne(existingAttempt.id);
-    }
-
-    // Also check NIJ uniqueness for this quiz
-    const existingNijAttempt = await this.attemptRepository.findOne({
-      where: {
-        nij: createAttemptDto.nij,
-        quizId: createAttemptDto.quizId,
-      },
-    });
-
-    if (existingNijAttempt) {
-      throw new BadRequestException(
-        `NIJ ${createAttemptDto.nij} sudah pernah digunakan untuk quiz ini.`,
-      );
     }
 
     // Calculate start and end date time
@@ -122,7 +108,7 @@ export class AttemptService {
       participantName: createAttemptDto.participantName,
       email: createAttemptDto.email,
       nij: createAttemptDto.nij,
-      servoNumber: createAttemptDto.servoNumber,
+      servoNumber: createAttemptDto.servoNumber || '0',
       serviceKey: createAttemptDto.serviceKey,
       startedAt: new Date(),
       startDateTime: startDateTime,
@@ -209,23 +195,6 @@ export class AttemptService {
             // Use existing attempt for submission
             savedAttempt = existingAttempt;
           } else {
-            // Check if NIJ already used for this quiz
-            const existingNijAttempt = await queryRunner.manager.findOne(
-              Attempt,
-              {
-                where: {
-                  nij: createAttemptDto.nij,
-                  quizId: createAttemptDto.quizId,
-                },
-              },
-            );
-
-            if (existingNijAttempt) {
-              throw new BadRequestException(
-                `NIJ ${createAttemptDto.nij} sudah pernah digunakan untuk quiz ini.`,
-              );
-            }
-
             // Calculate start and end date time for new attempt
             const startDateTime = new Date();
             let endDateTime: Date | null = null;
@@ -242,7 +211,7 @@ export class AttemptService {
               participantName: createAttemptDto.participantName,
               email: createAttemptDto.email,
               nij: createAttemptDto.nij,
-              servoNumber: createAttemptDto.servoNumber,
+              servoNumber: createAttemptDto.servoNumber || '0',
               serviceKey: createAttemptDto.serviceKey,
               startedAt: new Date(),
               startDateTime: startDateTime,
