@@ -15,6 +15,7 @@ export class R2StorageService implements IStorageService {
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
   private readonly backendUrl: string;
+  private readonly publicUrl: string | null;
   private readonly isEnabled: boolean = false;
 
   constructor(private readonly configService: ConfigService) {
@@ -26,7 +27,10 @@ export class R2StorageService implements IStorageService {
     this.bucketName =
       this.configService.get<string>('R2_BUCKET_NAME') || 'gms-quiz-app';
 
-    // Use backend URL instead of public R2 URL (bucket stays private)
+    // Public URL for direct CDN access (fastest, recommended)
+    this.publicUrl = this.configService.get<string>('R2_PUBLIC_URL') || null;
+
+    // Backend URL as fallback for private buckets
     this.backendUrl =
       this.configService.get<string>('BACKEND_URL') ||
       this.configService.get<string>('APP_URL') ||
@@ -52,8 +56,17 @@ export class R2StorageService implements IStorageService {
 
     this.isEnabled = true;
     this.logger.log(
-      `R2 Storage Service initialized with private bucket: ${this.bucketName}`,
+      `R2 Storage Service initialized with bucket: ${this.bucketName}`,
     );
+    if (this.publicUrl) {
+      this.logger.log(
+        `R2 Public URL configured: ${this.publicUrl} (Direct CDN access enabled)`,
+      );
+    } else {
+      this.logger.log(
+        'R2 Public URL not set. Using backend proxy for file serving.',
+      );
+    }
   }
 
   /**
@@ -70,7 +83,7 @@ export class R2StorageService implements IStorageService {
   }
 
   /**
-   * Upload file to R2 storage (private bucket)
+   * Upload file to R2 storage
    */
   async uploadFile(
     fileBuffer: Buffer,
@@ -80,6 +93,7 @@ export class R2StorageService implements IStorageService {
   ): Promise<{
     objectKey: string;
     backendUrl: string;
+    publicUrl?: string;
     fileSize: number;
   }> {
     if (!this.isEnabled) {
@@ -105,14 +119,20 @@ export class R2StorageService implements IStorageService {
       const command = new PutObjectCommand(uploadParams);
       await this.s3Client.send(command);
 
-      // Generate backend API URL instead of direct R2 URL
+      // Generate URLs: prefer public URL if available (fastest)
       const backendUrl = this.getBackendUrl(objectKey);
+      const publicUrl = this.publicUrl
+        ? this.getPublicUrl(objectKey)
+        : undefined;
 
-      this.logger.log(`File uploaded to private R2 bucket: ${objectKey}`);
+      this.logger.log(
+        `File uploaded to R2: ${objectKey} (Public: ${!!publicUrl})`,
+      );
 
       return {
         objectKey,
         backendUrl,
+        publicUrl,
         fileSize: fileBuffer.length,
       };
     } catch (error) {
@@ -191,11 +211,29 @@ export class R2StorageService implements IStorageService {
   }
 
   /**
-   * Get backend API URL for file (instead of direct R2 URL)
-   * This keeps the bucket private and serves files through backend
+   * Get public URL for direct CDN access (fastest)
+   * Only works if R2_PUBLIC_URL is configured
+   */
+  getPublicUrl(objectKey: string): string | null {
+    if (!this.publicUrl) {
+      return null;
+    }
+    return `${this.publicUrl}/${objectKey}`;
+  }
+
+  /**
+   * Get backend API URL for file (fallback for private buckets)
+   * Serves files through backend proxy
    */
   getBackendUrl(objectKey: string): string {
     return `${this.backendUrl}/api/files/${encodeURIComponent(objectKey)}`;
+  }
+
+  /**
+   * Get preferred URL (public if available, otherwise backend)
+   */
+  getPreferredUrl(objectKey: string): string {
+    return this.getPublicUrl(objectKey) || this.getBackendUrl(objectKey);
   }
 
   /**

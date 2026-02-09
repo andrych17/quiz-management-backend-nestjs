@@ -708,12 +708,13 @@ export class QuizService {
             correctAnswer: question.correctAnswer,
             images: images.map((img) => ({
               id: img.id,
+              sequence: img.sequence,
               fileName: img.fileName,
               originalName: img.originalName,
               mimeType: img.mimeType,
               fileSize: img.fileSize,
               altText: img.altText,
-              downloadUrl: `/api/files/${img.fileName}`,
+              downloadUrl: this.r2StorageService.getPreferredUrl(img.fileName),
             })),
           };
         }),
@@ -1306,7 +1307,7 @@ export class QuizService {
               mimeType: img.mimeType,
               fileSize: img.fileSize,
               altText: img.altText,
-              downloadUrl: `/api/files/${img.fileName}`,
+              downloadUrl: this.r2StorageService.getPreferredUrl(img.fileName),
             })),
           };
         }),
@@ -1499,7 +1500,7 @@ export class QuizService {
             mimeType: img.mimeType,
             fileSize: img.fileSize,
             altText: img.altText,
-            downloadUrl: `/api/files/${img.fileName}`,
+            downloadUrl: this.r2StorageService.getPreferredUrl(img.fileName),
           })),
         };
       }) || [],
@@ -1777,7 +1778,7 @@ export class QuizService {
               mimeType: img.mimeType,
               fileSize: img.fileSize,
               altText: img.altText,
-              downloadUrl: `/api/files/${img.fileName}`,
+              downloadUrl: this.r2StorageService.getPreferredUrl(img.fileName),
             })),
           };
         }),

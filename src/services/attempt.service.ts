@@ -11,6 +11,7 @@ import { AttemptAnswer } from '../entities/attempt-answer.entity';
 import { Quiz } from '../entities/quiz.entity';
 import { Question } from '../entities/question.entity';
 import { User } from '../entities/user.entity';
+import { QuizImage } from '../entities/quiz-image.entity';
 import {
   CreateAttemptDto,
   UpdateAttemptDto,
@@ -18,6 +19,7 @@ import {
 } from '../dto/attempt.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import { ConfigService } from './config.service';
+import { R2StorageService } from './r2-storage.service';
 import * as ExcelJS from 'exceljs';
 import { DebugLogger } from '../lib/debug-logger';
 import { toWIB, getAttemptStatus, getStatusLabel } from '../utils/datetime.util';
@@ -36,7 +38,10 @@ export class AttemptService {
     private questionRepository: Repository<Question>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(QuizImage)
+    private quizImageRepository: Repository<QuizImage>,
     private readonly configService: ConfigService,
+    private readonly r2StorageService: R2StorageService,
     private dataSource: DataSource,
   ) {}
 
@@ -989,28 +994,45 @@ export class AttemptService {
     const mappings = await this.configService.getMappings();
 
     // Map all questions to answers (or placeholder if no answer)
-    const detailedAnswers = questions.map((question, index) => {
-      const answer = answersMap.get(question.id);
+    const detailedAnswers = await Promise.all(
+      questions.map(async (question, index) => {
+        const answer = answersMap.get(question.id);
 
-      // If answer exists, use it; otherwise return "unanswered" state
-      const answerText = answer ? answer.answerText : null;
-      const isCorrect = answerText === question.correctAnswer;
-      const isSkipped =
-        answerText === null || answerText === undefined || answerText === '';
+        // If answer exists, use it; otherwise return "unanswered" state
+        const answerText = answer ? answer.answerText : null;
+        const isCorrect = answerText === question.correctAnswer;
+        const isSkipped =
+          answerText === null || answerText === undefined || answerText === '';
 
-      return {
-        id: answer ? answer.id : null,
-        questionId: question.id,
-        questionNumber: index + 1,
-        questionText: question.questionText,
-        questionType: question.questionType,
-        questionOptions: question.options || [],
-        answerText: isSkipped ? 'No answer provided' : answerText,
-        correctAnswer: question.correctAnswer,
-        isCorrect: isCorrect && !isSkipped,
-        isSkipped: isSkipped,
-      };
-    });
+        // Load images for this question
+        const images = await this.quizImageRepository.find({
+          where: { questionId: question.id, isActive: true },
+        });
+
+        return {
+          id: answer ? answer.id : null,
+          questionId: question.id,
+          questionNumber: index + 1,
+          questionText: question.questionText,
+          questionType: question.questionType,
+          questionOptions: question.options || [],
+          answerText: isSkipped ? 'No answer provided' : answerText,
+          correctAnswer: question.correctAnswer,
+          isCorrect: isCorrect && !isSkipped,
+          isSkipped: isSkipped,
+          images: images.map((img) => ({
+            id: img.id,
+            sequence: img.sequence,
+            fileName: img.fileName,
+            originalName: img.originalName,
+            mimeType: img.mimeType,
+            fileSize: img.fileSize,
+            altText: img.altText,
+            downloadUrl: this.r2StorageService.getPreferredUrl(img.fileName),
+          })),
+        };
+      }),
+    );
 
     return {
       id: attempt.id,
