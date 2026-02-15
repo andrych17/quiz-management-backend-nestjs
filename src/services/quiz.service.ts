@@ -1631,6 +1631,8 @@ export class QuizService {
         passingScore: templateQuiz.passingScore,
         questionsPerPage: templateQuiz.questionsPerPage,
         durationMinutes: templateQuiz.durationMinutes,
+        scoringMode: templateQuiz.scoringMode, // Copy scoring mode (standard or iq_test)
+        quizType: templateQuiz.quizType, // Copy quiz type (scheduled or manual)
         isActive: true,
         isPublished: false,
         startDateTime: null,
