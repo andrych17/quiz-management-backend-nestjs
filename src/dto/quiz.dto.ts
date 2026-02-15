@@ -11,6 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { QuizScoringMode } from '../entities/quiz.entity';
 
 export enum ServiceType {
   SERVICE_MANAGEMENT = 'service-management',
@@ -154,6 +155,15 @@ export class CreateQuizDto {
   serviceKey?: string;
 
   @ApiPropertyOptional({
+    example: QuizScoringMode.STANDARD,
+    enum: QuizScoringMode,
+    description: 'Scoring mode: standard (0-100) or iq_test (IQ categories with auto-fail for Borderline)',
+  })
+  @IsOptional()
+  @IsEnum(QuizScoringMode)
+  scoringMode?: QuizScoringMode;
+
+  @ApiPropertyOptional({
     example: 70,
     description: 'Passing score percentage (default: 70)',
   })
@@ -286,6 +296,15 @@ export class UpdateQuizDto {
   @IsOptional()
   @IsString()
   serviceKey?: string;
+
+  @ApiPropertyOptional({
+    example: QuizScoringMode.STANDARD,
+    enum: QuizScoringMode,
+    description: 'Scoring mode: standard (0-100) or iq_test (IQ categories with auto-fail for Borderline)',
+  })
+  @IsOptional()
+  @IsEnum(QuizScoringMode)
+  scoringMode?: QuizScoringMode;
 
   @ApiPropertyOptional({ example: 70, description: 'Passing score percentage' })
   @IsOptional()

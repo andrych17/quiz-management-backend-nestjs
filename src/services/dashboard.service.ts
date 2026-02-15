@@ -309,6 +309,7 @@ export class DashboardService {
         quizId: attempt.quizId,
         quizTitle: attempt.quiz?.title || 'Unknown Quiz',
         score: attempt.score,
+        grade: attempt.grade,
         correctAnswers: attempt.correctAnswers,
         totalQuestions: attempt.totalQuestions,
         passingScore: attempt.quiz?.passingScore || 0,

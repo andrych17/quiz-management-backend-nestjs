@@ -38,10 +38,10 @@ export class Attempt {
   serviceKey: string; // Service/jenis pelayanan yang dipilih peserta saat mengerjakan quiz
 
   @Column({ type: 'int', default: 0 })
-  score: number; // Nilai akhir (bisa 70, 80, 90 untuk mode IPK, atau 0-100 untuk mode persentase)
+  score: number; // Nilai akhir (bisa 70-130+ untuk IQ test, atau 0-100 untuk mode persentase)
 
-  @Column({ length: 10, nullable: true })
-  grade: string; // Grade (A, B, C, D, E, F)
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  grade: string; // Grade: untuk IQ test = kategori IQ (Borderline, Average, Superior, dll), untuk normal = A/B/C/D/E/F
 
   @Column({ type: 'int', default: 0 })
   correctAnswers: number; // Jumlah jawaban benar

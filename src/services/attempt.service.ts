@@ -24,6 +24,8 @@ import * as ExcelJS from 'exceljs';
 import { DebugLogger } from '../lib/debug-logger';
 import { toWIB, getAttemptStatus, getStatusLabel } from '../utils/datetime.util';
 import { retryAsync, isRetryableError } from '../lib/retry.util';
+import { calculateIQResult } from '../utils/iq-scoring.util';
+import { QuizScoringMode } from '../entities/quiz.entity';
 
 @Injectable()
 export class AttemptService {
@@ -251,22 +253,38 @@ export class AttemptService {
           // Update attempt with score and completion time using scoring templates
           const incorrectAnswers = totalQuestions - correctAnswers;
 
-          // Gunakan scoring system dari quiz (IPK mode atau standard points mode)
+          // Gunakan scoring system dari quiz (IQ scoring mode atau standard points mode)
           let finalScore = 0;
-          let grade = 'F';
+          let grade: string | null = null;
           let passed = false;
 
           DebugLogger.debug('AttemptService', 'Calculating score', {
             correctAnswers,
             totalQuestions,
+            scoringMode: quiz.scoringMode,
             hasScoringTemplates: quiz.scoringTemplates?.length > 0,
             scoringTemplatesCount: quiz.scoringTemplates?.length || 0,
           });
 
-          if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
-            // Mode IQ/Custom Scoring: Cari nilai berdasarkan jumlah benar
+          // Cek apakah quiz ini adalah IQ Test berdasarkan scoringMode
+          if (quiz.scoringMode === QuizScoringMode.IQ_TEST) {
+            // Mode IQ Test: Gunakan IQ scoring utilities
+            const iqResult = calculateIQResult(correctAnswers);
+
+            finalScore = iqResult.iqScore; // Final score = IQ score
+            grade = iqResult.category; // Grade = IQ category (Borderline, Average, Superior, dll)
+            passed = iqResult.passed; // Borderline otomatis tidak lulus
+
+            DebugLogger.success('AttemptService', 'Using IQ scoring (IQ Test mode)', {
+              correctAnswers,
+              iqScore: finalScore,
+              iqCategory: grade,
+              passed,
+            });
+          } else if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
+            // Mode Custom/Standard Scoring: Cari nilai berdasarkan jumlah benar
             const matchingTemplate = quiz.scoringTemplates.find(
-              (template) => template.correctAnswers === correctAnswers,
+              (template) => template.correctAnswers === correctAnswers && template.isActive,
             );
 
             DebugLogger.debug('AttemptService', 'Searching for matching template', {
@@ -282,29 +300,33 @@ export class AttemptService {
 
             if (matchingTemplate) {
               finalScore = matchingTemplate.points; // Nilai akhir dari tabel konversi (73, 74, 72, dll)
+              passed = finalScore >= (quiz.passingScore || 70);
               DebugLogger.success('AttemptService', 'Using scoring template', {
                 finalScore,
+                passed,
               });
             } else {
               // Fallback ke standard scoring (0-100) jika tidak ada template yang cocok
               finalScore = Math.round((correctAnswers / totalQuestions) * 100);
+              passed = finalScore >= (quiz.passingScore || 70);
               DebugLogger.warn(
                 'AttemptService',
                 'No matching template, using fallback',
                 {
                   finalScore,
+                  passed,
                 },
               );
             }
           } else {
             // Mode default: gunakan standard scoring (0-100)
             finalScore = Math.round((correctAnswers / totalQuestions) * 100);
+            passed = finalScore >= (quiz.passingScore || 70);
             DebugLogger.debug('AttemptService', 'No scoring templates, using default', {
               finalScore,
+              passed,
             });
           }
-
-          passed = finalScore >= (quiz.passingScore || 70);
 
           // Update attempt with final score
           savedAttempt.score = finalScore;
@@ -313,7 +335,7 @@ export class AttemptService {
           savedAttempt.submittedAt = new Date();
           savedAttempt.correctAnswers = correctAnswers;
           savedAttempt.incorrectAnswers = incorrectAnswers;
-          savedAttempt.totalQuestions = totalQuestions; // ✅ Add this field
+          savedAttempt.totalQuestions = totalQuestions;
 
           await queryRunner.manager.save(savedAttempt);
 
@@ -591,13 +613,14 @@ export class AttemptService {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Quiz Results');
 
-    // Set column headers with 2 status columns
+    // Set column headers
     worksheet.columns = [
       { header: 'Participant Name', key: 'participantName', width: 25 },
       { header: 'Email', key: 'email', width: 30 },
       { header: 'NIJ', key: 'nij', width: 15 },
       { header: 'Quiz Title', key: 'quizTitle', width: 30 },
       { header: 'Score', key: 'score', width: 10 },
+      { header: 'Grade', key: 'grade', width: 18 },
       { header: 'Correct Answers', key: 'correctAnswers', width: 18 },
       { header: 'Total Questions', key: 'totalQuestions', width: 18 },
       { header: 'Submission Status', key: 'submissionStatus', width: 20 },
@@ -629,6 +652,7 @@ export class AttemptService {
         nij: attempt.nij,
         quizTitle: attempt.quiz?.title || 'Unknown Quiz',
         score: attempt.score,
+        grade: attempt.grade || '-',
         correctAnswers: attempt.correctAnswers,
         totalQuestions: attempt.totalQuestions,
         submissionStatus: submissionStatus,
@@ -674,6 +698,49 @@ export class AttemptService {
           };
           passStatusCell.font = { color: { argb: 'FF9C0006' } }; // Dark red
         }
+      }
+
+      // Conditional formatting for grade
+      const gradeCell = row.getCell('grade');
+      if (attempt.grade) {
+        // IQ Categories
+        if (attempt.grade === 'Gifted') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB4A7D6' } }; // Purple
+          gradeCell.font = { color: { argb: 'FF4A148C' }, bold: true };
+        } else if (attempt.grade === 'Superior') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9FA8DA' } }; // Light purple
+          gradeCell.font = { color: { argb: 'FF311B92' }, bold: true };
+        } else if (attempt.grade === 'High Average') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF81C784' } }; // Light green
+          gradeCell.font = { color: { argb: 'FF1B5E20' }, bold: true };
+        } else if (attempt.grade === 'Average') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90CAF9' } }; // Light blue
+          gradeCell.font = { color: { argb: 'FF0D47A1' } };
+        } else if (attempt.grade === 'Low Average') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE082' } }; // Light yellow
+          gradeCell.font = { color: { argb: 'FFF57F17' } };
+        } else if (attempt.grade === 'Borderline') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEF9A9A' } }; // Light red
+          gradeCell.font = { color: { argb: 'FFB71C1C' }, bold: true };
+        }
+        // Standard Grades (A-F)
+        else if (attempt.grade === 'A') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } }; // Green
+          gradeCell.font = { color: { argb: 'FF006100' }, bold: true };
+        } else if (attempt.grade === 'B') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFA9D08E' } }; // Light green
+          gradeCell.font = { color: { argb: 'FF274E13' } };
+        } else if (attempt.grade === 'C') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD966' } }; // Yellow
+          gradeCell.font = { color: { argb: 'FF7F6000' } };
+        } else if (attempt.grade === 'D') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } }; // Orange
+          gradeCell.font = { color: { argb: 'FF9C0006' } };
+        } else if (attempt.grade === 'E' || attempt.grade === 'F') {
+          gradeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF6B6B' } }; // Red
+          gradeCell.font = { color: { argb: 'FF9C0006' }, bold: true };
+        }
+        gradeCell.alignment = { vertical: 'middle', horizontal: 'center' };
       }
     });
 
@@ -1072,6 +1139,7 @@ export class AttemptService {
         ).length,
         skippedAnswers: detailedAnswers.filter((a) => a.isSkipped).length,
         score: attempt.score,
+        grade: attempt.grade,
       },
     };
   }

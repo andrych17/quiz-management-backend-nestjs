@@ -14,6 +14,11 @@ export enum QuizType {
   MANUAL = 'manual',
 }
 
+export enum QuizScoringMode {
+  STANDARD = 'standard',
+  IQ_TEST = 'iq_test',
+}
+
 @Entity('quizzes')
 @Index(['token'], { unique: true })
 @Index(['slug'])
@@ -46,6 +51,14 @@ export class Quiz {
     default: QuizType.SCHEDULED,
   })
   quizType: QuizType; // SCHEDULED = ada jadwal tetap, MANUAL = dimulai manual oleh admin
+
+  @Column({
+    type: 'enum',
+    enum: QuizScoringMode,
+    enumName: 'quiz_scoring_mode_enum',
+    default: QuizScoringMode.STANDARD,
+  })
+  scoringMode: QuizScoringMode; // STANDARD = scoring biasa (0-100), IQ_TEST = scoring IQ dengan kategori
 
   @Column({ nullable: true })
   locationKey: string; // Store config key directly (e.g., 'jakarta_pusat', 'jakarta_utara')

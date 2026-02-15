@@ -925,7 +925,7 @@ export class MainSeeder {
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
-      // 32-35 correct: Score 123-139
+      // 32 correct: Score 123
       {
         quizId,
         correctAnswers: 32,
@@ -934,6 +934,7 @@ export class MainSeeder {
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
+      // 33 correct: Score 125
       {
         quizId,
         correctAnswers: 33,
@@ -942,6 +943,7 @@ export class MainSeeder {
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
+      // 34 correct: Score 132
       {
         quizId,
         correctAnswers: 34,
@@ -950,6 +952,7 @@ export class MainSeeder {
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
+      // 35-40 correct: Score 139
       {
         quizId,
         correctAnswers: 35,

@@ -7,7 +7,9 @@ import {
   IsNumber,
   Min,
   Max,
+  IsEnum,
 } from 'class-validator';
+import { ScoringType } from '../entities/quiz-scoring.entity';
 
 export class CreateQuizScoringDto {
   @ApiProperty({ example: 1, description: 'Quiz ID' })
@@ -22,6 +24,15 @@ export class CreateQuizScoringDto {
   @IsNotEmpty()
   @IsString()
   scoringName: string;
+
+  @ApiPropertyOptional({
+    example: ScoringType.STANDARD,
+    enum: ScoringType,
+    description: 'Scoring type: standard or IQ scoring (default: standard)',
+  })
+  @IsOptional()
+  @IsEnum(ScoringType)
+  scoringType?: ScoringType;
 
   @ApiPropertyOptional({
     example: 10,
@@ -133,6 +144,15 @@ export class UpdateQuizScoringDto {
   scoringName?: string;
 
   @ApiPropertyOptional({
+    example: ScoringType.STANDARD,
+    enum: ScoringType,
+    description: 'Scoring type: standard or IQ scoring',
+  })
+  @IsOptional()
+  @IsEnum(ScoringType)
+  scoringType?: ScoringType;
+
+  @ApiPropertyOptional({
     example: 15,
     description: 'Points awarded for correct answers',
   })
@@ -232,6 +252,19 @@ export class QuizScoringResponseDto {
     description: 'Scoring template name',
   })
   scoringName: string;
+
+  @ApiProperty({
+    example: ScoringType.STANDARD,
+    enum: ScoringType,
+    description: 'Scoring type',
+  })
+  scoringType: ScoringType;
+
+  @ApiPropertyOptional({
+    example: 'Average',
+    description: 'IQ category (only for IQ scoring type)',
+  })
+  category?: string;
 
   @ApiProperty({
     example: 10,

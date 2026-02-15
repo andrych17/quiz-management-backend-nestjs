@@ -10,6 +10,20 @@ import {
 } from 'typeorm';
 import { Quiz } from './quiz.entity';
 
+export enum ScoringType {
+  STANDARD = 'standard',
+  IQ_SCORING = 'iq_scoring',
+}
+
+export enum IQCategory {
+  GIFTED = 'Gifted',
+  SUPERIOR = 'Superior',
+  HIGH_AVERAGE = 'High Average',
+  AVERAGE = 'Average',
+  LOW_AVERAGE = 'Low Average',
+  BORDERLINE = 'Borderline',
+}
+
 @Entity('quiz_scoring')
 @Index(['quizId'])
 export class QuizScoring {
@@ -21,6 +35,17 @@ export class QuizScoring {
 
   @Column({ nullable: true })
   scoringName: string; // Nama template scoring (A, B, C, dll atau deskripsi lain)
+
+  @Column({
+    type: 'enum',
+    enum: ScoringType,
+    enumName: 'scoring_type_enum',
+    default: ScoringType.STANDARD,
+  })
+  scoringType: ScoringType; // STANDARD = scoring biasa, IQ_SCORING = scoring berbasis IQ
+
+  @Column({ nullable: true })
+  category: string; // IQ Category hasil dari scoring (Borderline, Average, Superior, dll)
 
   @Column({ type: 'int', default: 0 })
   correctAnswers: number; // Jumlah jawaban benar untuk mapping ini
