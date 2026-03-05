@@ -4,9 +4,11 @@ import {
   Param,
   Res,
   NotFoundException,
+  InternalServerErrorException,
   StreamableFile,
   Inject,
   Header,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
@@ -18,6 +20,8 @@ import {
 @ApiTags('files')
 @Controller('api/files')
 export class FileController {
+  private readonly logger = new Logger(FileController.name);
+
   constructor(
     @Inject(STORAGE_SERVICE_TOKEN)
     private readonly storageService: IStorageService,
@@ -65,7 +69,28 @@ export class FileController {
       // Send raw binary data
       res.send(file.body);
     } catch (error) {
-      throw new NotFoundException(`File not found: ${decodedKey}`);
+      const errorMessage = error?.message || String(error);
+      this.logger.error(
+        `Failed to serve file [${decodedKey}]: ${errorMessage}`,
+        error?.stack,
+      );
+
+      // R2/S3 returns NoSuchKey when file doesn't exist
+      const isNotFound =
+        error?.name === 'NoSuchKey' ||
+        error?.$metadata?.httpStatusCode === 404 ||
+        errorMessage.includes('NoSuchKey') ||
+        errorMessage.includes('not found') ||
+        errorMessage.includes('does not exist');
+
+      if (isNotFound) {
+        throw new NotFoundException(`File not found: ${decodedKey}`);
+      }
+
+      // Other errors (credentials, network, disabled, etc.)
+      throw new InternalServerErrorException(
+        `Failed to retrieve file: ${errorMessage}`,
+      );
     }
   }
 }
