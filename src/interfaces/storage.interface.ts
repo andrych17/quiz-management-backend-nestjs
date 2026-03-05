@@ -56,6 +56,12 @@ export interface IStorageService {
    * @returns Object key or null
    */
   extractObjectKey(url: string): string | null;
+
+  /**
+   * Get storage configuration info for debugging
+   * @returns Object with masked config details
+   */
+  getStorageInfo(): Record<string, any>;
 }
 
 export const STORAGE_SERVICE_TOKEN = 'STORAGE_SERVICE';

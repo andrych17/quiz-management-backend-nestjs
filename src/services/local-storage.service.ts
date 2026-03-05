@@ -226,4 +226,12 @@ export class LocalStorageService implements IStorageService {
       return null;
     }
   }
+
+  getStorageInfo(): Record<string, any> {
+    return {
+      provider: 'local',
+      basePath: this.basePath,
+      baseUrl: this.baseUrl,
+    };
+  }
 }

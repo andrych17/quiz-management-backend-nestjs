@@ -87,10 +87,19 @@ export class FileController {
         throw new NotFoundException(`File not found: ${decodedKey}`);
       }
 
+      // Include R2 config info for debugging
+      let storageInfo = {};
+      try {
+        storageInfo = this.storageService.getStorageInfo();
+      } catch (_) {}
+
+      this.logger.error('Storage config:', JSON.stringify(storageInfo));
+
       // Other errors (credentials, network, disabled, etc.)
-      throw new InternalServerErrorException(
-        `Failed to retrieve file: ${errorMessage}`,
-      );
+      throw new InternalServerErrorException({
+        message: `Failed to retrieve file: ${errorMessage}`,
+        storageConfig: storageInfo,
+      });
     }
   }
 }

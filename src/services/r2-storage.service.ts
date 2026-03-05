@@ -237,6 +237,26 @@ export class R2StorageService implements IStorageService {
   }
 
   /**
+   * Get storage configuration info for debugging (credentials masked)
+   */
+  getStorageInfo(): Record<string, any> {
+    const accountId = this.configService.get<string>('R2_ACCOUNT_ID');
+    const accessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY');
+
+    return {
+      provider: 'r2',
+      enabled: this.isEnabled,
+      bucket: this.bucketName,
+      accountId: accountId ? `${accountId.substring(0, 6)}...` : '(not set)',
+      accessKeyId: accessKeyId ? `${accessKeyId.substring(0, 6)}...` : '(not set)',
+      secretAccessKey: secretAccessKey ? '***set***' : '(not set)',
+      publicUrl: this.publicUrl || '(not set)',
+      backendUrl: this.backendUrl,
+    };
+  }
+
+  /**
    * Extract object key from backend API URL
    */
   extractObjectKey(backendUrl: string): string | null {
