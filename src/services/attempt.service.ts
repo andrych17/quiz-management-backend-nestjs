@@ -24,7 +24,7 @@ import * as ExcelJS from 'exceljs';
 import { DebugLogger } from '../lib/debug-logger';
 import { toWIB, getAttemptStatus, getStatusLabel } from '../utils/datetime.util';
 import { retryAsync, isRetryableError } from '../lib/retry.util';
-import { calculateIQResult } from '../utils/iq-scoring.util';
+import { calculateIQResult, getIQCategory, passedIQTest } from '../utils/iq-scoring.util';
 import { QuizScoringMode } from '../entities/quiz.entity';
 
 @Injectable()
@@ -268,12 +268,34 @@ export class AttemptService {
 
           // Cek apakah quiz ini adalah IQ Test berdasarkan scoringMode
           if (quiz.scoringMode === QuizScoringMode.IQ_TEST) {
-            // Mode IQ Test: Gunakan IQ scoring utilities
-            const iqResult = calculateIQResult(correctAnswers);
+            // Mode IQ Test: cek DB scoring template dulu, fallback ke hardcoded mapping
+            const matchingTemplate = quiz.scoringTemplates?.find(
+              (template) => template.correctAnswers === correctAnswers && template.isActive,
+            );
 
-            finalScore = iqResult.iqScore; // Final score = IQ score
-            grade = iqResult.category; // Grade = IQ category (Borderline, Average, Superior, dll)
-            passed = iqResult.passed; // Borderline otomatis tidak lulus
+            let iqScore: number;
+            if (matchingTemplate) {
+              // Gunakan nilai dari DB (source of truth)
+              iqScore = matchingTemplate.points;
+              DebugLogger.success('AttemptService', 'IQ Test: using DB scoring template', {
+                correctAnswers,
+                iqScore,
+              });
+            } else {
+              // Fallback ke hardcoded mapping
+              iqScore = calculateIQResult(correctAnswers).iqScore;
+              DebugLogger.warn('AttemptService', 'IQ Test: no DB template found, using hardcoded mapping', {
+                correctAnswers,
+                iqScore,
+              });
+            }
+
+            const iqCategory = getIQCategory(iqScore);
+            const iqPassed = passedIQTest(iqScore);
+
+            finalScore = iqScore;
+            grade = iqCategory;
+            passed = iqPassed;
 
             DebugLogger.success('AttemptService', 'Using IQ scoring (IQ Test mode)', {
               correctAnswers,
