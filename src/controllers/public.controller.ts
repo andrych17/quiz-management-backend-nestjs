@@ -26,6 +26,7 @@ import {
 import { Idempotent } from '../decorators/idempotent.decorator';
 import { IdempotencyInterceptor } from '../interceptors/idempotency.interceptor';
 import { QuizSessionPayload } from '../auth/quiz-session.strategy';
+import { QuizSessionService } from '../services/quiz-session.service';
 
 @ApiTags('public')
 @Controller('api/public')
@@ -37,22 +38,29 @@ export class PublicController {
     private readonly configService: AppConfigService,
     private readonly jwtService: JwtService,
     private readonly nestConfigService: ConfigService,
+    private readonly quizSessionService: QuizSessionService,
   ) {}
 
   /**
-   * Validate x-session-token header against the submitted data.
+   * Validate quiz session token against the submitted data.
+   * Reads from the request body field `sessionToken`, with fallback to
+   * the `x-session-token` header for backward compatibility.
    * Only called when answers are present (actual submit, not start).
    */
   private validateQuizSessionToken(
     req: Request,
+    body: CreateAttemptDto,
     email: string,
     nij: string,
     quizId: number,
   ): void {
-    const rawToken = req.headers['x-session-token'] as string | undefined;
+    // Prefer body field, fall back to header for backward compat
+    const rawToken =
+      body.sessionToken ||
+      (req.headers['x-session-token'] as string | undefined);
     if (!rawToken) {
       throw new UnauthorizedException(
-        'Header x-session-token diperlukan saat submit jawaban. ' +
+        'Session token diperlukan saat submit jawaban. ' +
           'Pastikan Anda memulai quiz terlebih dahulu untuk mendapatkan session token.',
       );
     }
@@ -244,6 +252,17 @@ export class PublicController {
       timeExpired = now > existingAttempt.endDateTime;
     }
 
+    // Issue a fresh session token so the frontend can submit after resume
+    const sessionToken = this.quizSessionService.signSessionToken(
+      {
+        sub: existingAttempt.id,
+        quizId: existingAttempt.quizId,
+        email: existingAttempt.email,
+        nij: existingAttempt.nij,
+      },
+      (quiz as any).durationMinutes ? `${(quiz as any).durationMinutes + 30}m` : '8h',
+    );
+
     // Return attempt data for resume (including timeExpired flag for FE to handle)
     const result = {
       attemptId: existingAttempt.id,
@@ -258,6 +277,7 @@ export class PublicController {
       startedAt: existingAttempt.startedAt,
       answers: (existingAttempt as any).answers || [],
       timeExpired: timeExpired, // Include flag for frontend to handle UI state
+      sessionToken, // Fresh token so the frontend can submit after resume
     };
 
     return ResponseFactory.success(
@@ -334,7 +354,7 @@ export class PublicController {
     description:
       'Endpoint untuk submit jawaban quiz secara publik. ' +
       'Saat memulai quiz (answers kosong) server mengembalikan sessionToken. ' +
-      'Saat submit jawaban, kirim sessionToken via header x-session-token. ' +
+      'Saat submit jawaban, kirim sessionToken di body request (atau via header x-session-token sebagai fallback). ' +
       'Supports idempotency for safe retries.',
   })
   @ApiParam({
@@ -346,7 +366,7 @@ export class PublicController {
   @ApiHeader({
     name: 'x-session-token',
     description:
-      'Session JWT yang diterima saat memulai quiz (wajib saat submit jawaban)',
+      '(Deprecated — gunakan field sessionToken di body) Session JWT yang diterima saat memulai quiz',
     required: false,
   })
   @ApiHeader({
@@ -392,6 +412,7 @@ export class PublicController {
     if (hasAnswers) {
       this.validateQuizSessionToken(
         req,
+        submitData,
         submitData.email,
         submitData.nij,
         quiz.id,
@@ -402,10 +423,12 @@ export class PublicController {
     submitData.quizId = quiz.id;
 
     // Create the attempt (but don't return scores/results to participant)
-    await this.attemptService.create(submitData);
+    const attemptDto = await this.attemptService.create(submitData);
 
-    // Return only confirmation without revealing scores
-    const result = {
+    // Return only confirmation without revealing scores.
+    // When starting (no answers), include sessionToken so the frontend can
+    // send it back via x-session-token header on the actual submit call.
+    const result: Record<string, any> = {
       submitted: true,
       participantName: submitData.participantName,
       email: submitData.email,
@@ -417,6 +440,13 @@ export class PublicController {
         title: quiz.title,
       },
     };
+
+    if (!hasAnswers && (attemptDto as any)?.sessionToken) {
+      result.sessionToken = (attemptDto as any).sessionToken;
+      result.attemptId = (attemptDto as any).id ?? null;
+      result.startDateTime = (attemptDto as any).startDateTime ?? null;
+      result.endDateTime = (attemptDto as any).endDateTime ?? null;
+    }
 
     return ResponseFactory.success(
       result,

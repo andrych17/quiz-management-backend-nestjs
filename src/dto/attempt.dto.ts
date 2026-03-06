@@ -105,6 +105,16 @@ export class CreateAttemptDto {
   @ValidateNested({ each: true })
   @Type(() => SubmitAnswerDto)
   answers: SubmitAnswerDto[];
+
+  @ApiPropertyOptional({
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description:
+      'Session JWT received when starting the quiz. ' +
+      'Required when submitting answers (answers array is not empty).',
+  })
+  @IsOptional()
+  @IsString()
+  sessionToken?: string;
 }
 
 export class UpdateAttemptDto {
@@ -217,7 +227,7 @@ export class AttemptResponseDto {
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
     description:
       'Short-lived session JWT returned only when a quiz is started (no answers submitted yet). ' +
-      'Must be sent back as the x-session-token header when submitting answers.',
+      'Must be sent back in the request body sessionToken field when submitting answers.',
   })
   sessionToken?: string;
 }

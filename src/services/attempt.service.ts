@@ -97,6 +97,35 @@ export class AttemptService {
         throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
       }
 
+      // Check if attempt time has expired and no answers were given
+      const now = new Date();
+      const isExpired =
+        existingAttempt.endDateTime && now > existingAttempt.endDateTime;
+
+      // Load answers to decide whether to reset or resume
+      const existingWithAnswers = await this.attemptRepository.findOne({
+        where: { id: existingAttempt.id },
+        relations: ['answers'],
+      });
+      const hasAnswers =
+        existingWithAnswers?.answers && existingWithAnswers.answers.length > 0;
+
+      if (isExpired && !hasAnswers) {
+        // Expired with no answers → reset timer so user gets a fresh window
+        const freshStart = new Date();
+        let freshEnd: Date | null = null;
+        if (quiz.durationMinutes) {
+          freshEnd = new Date(
+            freshStart.getTime() + quiz.durationMinutes * 60000,
+          );
+        }
+        await this.attemptRepository.update(existingAttempt.id, {
+          startDateTime: freshStart,
+          endDateTime: freshEnd,
+          startedAt: freshStart,
+        });
+      }
+
       // Allow resume - return existing attempt with fresh session token
       const dto = await this.findOne(existingAttempt.id);
       dto.sessionToken = this.quizSessionService.signSessionToken(
