@@ -7,8 +7,12 @@ import {
   HttpStatus,
   BadRequestException,
   UseInterceptors,
+  UseGuards,
+  Req,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader } from '@nestjs/swagger';
+import { Request } from 'express';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { AttemptService } from '../services/attempt.service';
 import { ConfigService } from '../services/config.service';
@@ -20,6 +24,8 @@ import {
 } from '../interfaces/api-response.interface';
 import { Idempotent } from '../decorators/idempotent.decorator';
 import { IdempotencyInterceptor } from '../interceptors/idempotency.interceptor';
+import { QuizSessionGuard } from '../auth/quiz-session-auth.guard';
+import { QuizSessionPayload } from '../auth/quiz-session.strategy';
 
 @ApiTags('public')
 @Controller('api/public')
@@ -270,6 +276,8 @@ export class PublicController {
   }
 
   @Post('quiz/:token/submit')
+  @UseGuards(QuizSessionGuard)
+  @ApiBearerAuth('quiz-session')
   @Idempotent(300) // Cache idempotent responses for 5 minutes
   @ApiOperation({
     summary: 'Submit jawaban quiz (tanpa autentikasi)',
@@ -306,9 +314,21 @@ export class PublicController {
     description: 'Too many requests. Please try again later.',
   })
   async submitQuizAttempt(
+    @Req() req: Request,
     @Param('token') token: string,
     @Body() submitData: CreateAttemptDto,
   ): Promise<StdApiResponse<any>> {
+    // Validate session token payload matches submission data
+    const session = req.user as QuizSessionPayload;
+    if (
+      session.email !== submitData.email ||
+      session.nij !== submitData.nij
+    ) {
+      throw new UnauthorizedException(
+        'Session token tidak cocok dengan data peserta yang di-submit. ' +
+          'Pastikan email dan NIJ sesuai dengan saat memulai quiz.',
+      );
+    }
     // Handle both formats: plain token (ABC123) or slug-token (test-ABC123)
     const actualToken = this.extractToken(token);
     // Verify quiz exists and is accessible
@@ -316,6 +336,14 @@ export class PublicController {
     if (!quiz) {
       throw new BadRequestException(
         'Quiz tidak ditemukan atau tidak dapat diakses',
+      );
+    }
+
+    // Validate session token's quizId matches the quiz from the URL token
+    if (session.quizId !== quiz.id) {
+      throw new UnauthorizedException(
+        'Session token tidak sesuai dengan quiz ini. ' +
+          'Pastikan Anda mengakses quiz yang sama saat memulai.',
       );
     }
 

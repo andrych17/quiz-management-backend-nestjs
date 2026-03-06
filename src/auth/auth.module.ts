@@ -7,6 +7,8 @@ import { AuthService } from '../services/auth.service';
 import { AuthController } from '../controllers/auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
+import { QuizSessionStrategy } from './quiz-session.strategy';
+import { QuizSessionService } from '../services/quiz-session.service';
 import { SharedServicesModule } from '../shared/shared-services.module';
 
 @Module({
@@ -26,7 +28,7 @@ import { SharedServicesModule } from '../shared/shared-services.module';
     SharedServicesModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, LocalStrategy, JwtStrategy, QuizSessionStrategy, QuizSessionService],
+  exports: [AuthService, JwtModule, QuizSessionService],
 })
 export class AuthModule {}

@@ -26,6 +26,7 @@ import { toWIB, getAttemptStatus, getStatusLabel } from '../utils/datetime.util'
 import { retryAsync, isRetryableError } from '../lib/retry.util';
 import { calculateIQResult, getIQCategory, passedIQTest } from '../utils/iq-scoring.util';
 import { QuizScoringMode } from '../entities/quiz.entity';
+import { QuizSessionService } from './quiz-session.service';
 
 @Injectable()
 export class AttemptService {
@@ -44,6 +45,7 @@ export class AttemptService {
     private quizImageRepository: Repository<QuizImage>,
     private readonly configService: ConfigService,
     private readonly r2StorageService: R2StorageService,
+    private readonly quizSessionService: QuizSessionService,
     private dataSource: DataSource,
   ) {}
 
@@ -95,8 +97,18 @@ export class AttemptService {
         throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_SUBMISSION);
       }
 
-      // Allow resume - return existing attempt
-      return this.findOne(existingAttempt.id);
+      // Allow resume - return existing attempt with fresh session token
+      const dto = await this.findOne(existingAttempt.id);
+      dto.sessionToken = this.quizSessionService.signSessionToken(
+        {
+          sub: existingAttempt.id,
+          quizId: existingAttempt.quizId,
+          email: existingAttempt.email,
+          nij: existingAttempt.nij,
+        },
+        quiz.durationMinutes ? `${quiz.durationMinutes + 30}m` : '8h',
+      );
+      return dto;
     }
 
     // Calculate start and end date time
@@ -124,7 +136,17 @@ export class AttemptService {
     });
 
     const savedAttempt = await this.attemptRepository.save(attempt);
-    return this.findOne(savedAttempt.id);
+    const dto = await this.findOne(savedAttempt.id);
+    dto.sessionToken = this.quizSessionService.signSessionToken(
+      {
+        sub: savedAttempt.id,
+        quizId: savedAttempt.quizId,
+        email: savedAttempt.email,
+        nij: savedAttempt.nij,
+      },
+      quiz.durationMinutes ? `${quiz.durationMinutes + 30}m` : '8h',
+    );
+    return dto;
   }
 
   async findByEmailAndQuiz(email: string, quizId: number) {
@@ -270,13 +292,13 @@ export class AttemptService {
           if (quiz.scoringMode === QuizScoringMode.IQ_TEST) {
             // Mode IQ Test: cek DB scoring template dulu, fallback ke hardcoded mapping
             const matchingTemplate = quiz.scoringTemplates?.find(
-              (template) => template.correctAnswers === correctAnswers && template.isActive,
+              (template) => Number(template.correctAnswers) === Number(correctAnswers) && template.isActive !== false,
             );
 
             let iqScore: number;
             if (matchingTemplate) {
               // Gunakan nilai dari DB (source of truth)
-              iqScore = matchingTemplate.points;
+              iqScore = Number(matchingTemplate.points);
               DebugLogger.success('AttemptService', 'IQ Test: using DB scoring template', {
                 correctAnswers,
                 iqScore,
@@ -306,7 +328,7 @@ export class AttemptService {
           } else if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
             // Mode Custom/Standard Scoring: Cari nilai berdasarkan jumlah benar
             const matchingTemplate = quiz.scoringTemplates.find(
-              (template) => template.correctAnswers === correctAnswers && template.isActive,
+              (template) => Number(template.correctAnswers) === Number(correctAnswers) && template.isActive !== false,
             );
 
             DebugLogger.debug('AttemptService', 'Searching for matching template', {
@@ -321,7 +343,7 @@ export class AttemptService {
             });
 
             if (matchingTemplate) {
-              finalScore = matchingTemplate.points; // Nilai akhir dari tabel konversi (73, 74, 72, dll)
+              finalScore = Number(matchingTemplate.points); // Nilai akhir dari tabel konversi (73, 74, 72, dll)
               passed = finalScore >= (quiz.passingScore || 70);
               DebugLogger.success('AttemptService', 'Using scoring template', {
                 finalScore,

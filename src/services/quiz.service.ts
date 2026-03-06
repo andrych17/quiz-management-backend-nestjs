@@ -4,12 +4,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Not } from 'typeorm';
+import { Repository, Like, Not, IsNull } from 'typeorm';
 import { Quiz } from '../entities/quiz.entity';
 import { Question } from '../entities/question.entity';
 import { QuizImage } from '../entities/quiz-image.entity';
 import { QuizScoring } from '../entities/quiz-scoring.entity';
 import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
+import { Attempt } from '../entities/attempt.entity';
 import { User } from '../entities/user.entity';
 import {
   CreateQuizDto,
@@ -47,6 +48,8 @@ export class QuizService {
     private readonly quizScoringRepository: Repository<QuizScoring>,
     @InjectRepository(UserQuizAssignment)
     private readonly userQuizAssignmentRepository: Repository<UserQuizAssignment>,
+    @InjectRepository(Attempt)
+    private readonly attemptRepository: Repository<Attempt>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly urlGeneratorService: UrlGeneratorService,
@@ -721,6 +724,11 @@ export class QuizService {
       );
     }
 
+    // Count active (unsubmitted) attempts
+    const activeAttemptsCount = await this.attemptRepository.count({
+      where: { quizId: id, submittedAt: IsNull() },
+    });
+
     // Get config mappings for service and location names
     const mappings = await this.configService.getMappings();
 
@@ -744,6 +752,7 @@ export class QuizService {
       ...quiz,
       questions: questionsWithImages,
       assignedUsers,
+      activeAttemptsCount,
       quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
       serviceName: quiz.serviceKey
         ? mappings.services.mapping[quiz.serviceKey] || quiz.serviceKey
