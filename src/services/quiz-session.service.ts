@@ -35,7 +35,7 @@ export class QuizSessionService {
   ): string {
     return this.jwtService.sign(
       { ...data, type: 'quiz-session' },
-      { secret: this.secret, expiresIn },
+      { secret: this.secret, expiresIn: expiresIn as never },
     );
   }
 }
