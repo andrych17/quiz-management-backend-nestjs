@@ -413,16 +413,19 @@ export class QuestionService {
       throw new NotFoundException(ERROR_MESSAGES.RECORD_NOT_FOUND);
     }
 
-    // Check if quiz has attempts - cannot delete question if quiz has been taken
+    // Check if quiz is currently running - cannot delete question while quiz is in progress
     const quiz = await this.quizRepository.findOne({
       where: { id: question.quizId },
       relations: ['attempts'],
     });
 
-    if (quiz && quiz.attempts && quiz.attempts.length > 0) {
-      throw new BadRequestException(
-        `Pertanyaan tidak dapat dihapus karena quiz sudah dikerjakan oleh ${quiz.attempts.length} peserta.`,
-      );
+    if (quiz) {
+      const activeAttempts = (quiz.attempts || []).filter(a => !a.submittedAt);
+      if (activeAttempts.length > 0) {
+        throw new BadRequestException(
+          `Pertanyaan tidak dapat dihapus karena quiz sedang dikerjakan oleh ${activeAttempts.length} peserta.`,
+        );
+      }
     }
 
     // Delete all images from storage for this question

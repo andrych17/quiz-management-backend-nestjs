@@ -784,11 +784,12 @@ export class QuizService {
 
     // Handle questions update
     if (questions !== undefined) {
-      // Check if quiz has attempts - cannot edit questions if quiz has been taken
-      if (quiz.attempts && quiz.attempts.length > 0) {
+      // Check if quiz is currently running (has in-progress attempts that haven't been submitted yet)
+      const activeAttempts = (quiz.attempts || []).filter(a => !a.submittedAt);
+      if (activeAttempts.length > 0) {
         throw new BadRequestException(
-          'Tidak dapat mengubah soal untuk quiz yang sudah dikerjakan oleh peserta. ' +
-            'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
+          `Tidak dapat mengubah soal karena quiz sedang dikerjakan oleh ${activeAttempts.length} peserta. ` +
+            'Tunggu hingga semua peserta selesai mengerjakan quiz.',
         );
       }
 
@@ -903,6 +904,26 @@ export class QuizService {
           const existingImagesMap = new Map(
             existingImages.map((img) => [img.sequence, img]),
           );
+
+          // Handle image deletions first (before adding new ones)
+          if (questionData.deleteImageIds && questionData.deleteImageIds.length > 0) {
+            for (const imageId of questionData.deleteImageIds) {
+              try {
+                const imageToDelete = await this.quizImageRepository.findOne({
+                  where: { id: imageId, questionId: savedQuestion.id },
+                });
+                if (imageToDelete) {
+                  await this.safeDeleteImageFile(imageToDelete.fileName, imageToDelete.id);
+                  await this.quizImageRepository.delete({ id: imageId });
+                  // Remove from map so upload logic doesn't reference it
+                  existingImagesMap.delete(imageToDelete.sequence);
+                  DebugLogger.debug('QuizService', `Deleted image ID ${imageId} for question ${i + 1}`);
+                }
+              } catch (deleteError) {
+                DebugLogger.error('QuizService', `Failed to delete image ${imageId}`, deleteError.message);
+              }
+            }
+          }
 
           // Handle multiple images upload (new multi-image support)
           if (
@@ -1124,11 +1145,12 @@ export class QuizService {
 
     // Handle scoring templates update (grade range)
     if (scoringTemplates !== undefined) {
-      // Check if quiz has attempts - cannot edit scoring if quiz has been taken
-      if (quiz.attempts && quiz.attempts.length > 0) {
+      // Check if quiz is currently running (has in-progress attempts)
+      const activeAttemptsForScoring = (quiz.attempts || []).filter(a => !a.submittedAt);
+      if (activeAttemptsForScoring.length > 0) {
         throw new BadRequestException(
-          'Tidak dapat mengubah template penilaian untuk quiz yang sudah dikerjakan oleh peserta. ' +
-            'Hal ini untuk menjaga keadilan dan integritas hasil quiz yang sudah ada.',
+          `Tidak dapat mengubah template penilaian karena quiz sedang dikerjakan oleh ${activeAttemptsForScoring.length} peserta. ` +
+            'Tunggu hingga semua peserta selesai mengerjakan quiz.',
         );
       }
 

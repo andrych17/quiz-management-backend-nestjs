@@ -426,6 +426,7 @@ export class UpdateQuizDto {
       mimeType?: string;
       fileSize?: number;
     }>;
+    deleteImageIds?: number[]; // IDs of images to delete during update
   }>;
 }
 
