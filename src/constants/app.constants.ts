@@ -15,8 +15,8 @@ export const APP_URLS = {
 // JWT Configuration
 export const JWT_CONFIG = {
   SECRET: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-  EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
-  REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
+  REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '24h',
 } as const;
 
 // API Endpoints
@@ -115,8 +115,8 @@ export const DEFAULTS = {
 
   // Token settings
   TOKEN: {
-    JWT_EXPIRES_IN: '7d',
-    REFRESH_TOKEN_EXPIRES_IN: '7d',
+    JWT_EXPIRES_IN: '24h',
+    REFRESH_TOKEN_EXPIRES_IN: '24h',
     QUIZ_TOKEN_LENGTH: 12,
   },
 

@@ -56,6 +56,13 @@ export class FileController {
     // Decode the object key (it might be URL encoded)
     const decodedKey = decodeURIComponent(objectKey);
 
+    // Get storage info upfront for consistent error reporting
+    let storageInfo: Record<string, any> = {};
+    try {
+      storageInfo = this.storageService.getStorageInfo();
+    } catch (_) {}
+    const provider: string = storageInfo?.provider || 'unknown';
+
     try {
       // Retrieve file from storage backend
       const file = await this.storageService.getFile(decodedKey);
@@ -71,7 +78,7 @@ export class FileController {
     } catch (error) {
       const errorMessage = error?.message || String(error);
       this.logger.error(
-        `Failed to serve file [${decodedKey}]: ${errorMessage}`,
+        `[${provider}] Failed to serve file [key=${decodedKey}]: ${errorMessage}`,
         error?.stack,
       );
 
@@ -84,20 +91,17 @@ export class FileController {
         errorMessage.includes('does not exist');
 
       if (isNotFound) {
-        throw new NotFoundException(`File not found: ${decodedKey}`);
+        this.logger.error('Storage config:', JSON.stringify(storageInfo));
+        throw new NotFoundException(
+          `[${provider}] File not found: ${decodedKey}`,
+        );
       }
-
-      // Include R2 config info for debugging
-      let storageInfo = {};
-      try {
-        storageInfo = this.storageService.getStorageInfo();
-      } catch (_) {}
 
       this.logger.error('Storage config:', JSON.stringify(storageInfo));
 
       // Other errors (credentials, network, disabled, etc.)
       throw new InternalServerErrorException({
-        message: `Failed to retrieve file: ${errorMessage}`,
+        message: `[${provider}] Failed to retrieve file: ${errorMessage}`,
         storageConfig: storageInfo,
       });
     }

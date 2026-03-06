@@ -18,7 +18,7 @@ import { SharedServicesModule } from '../shared/shared-services.module';
         secret: configService.get<string>('JWT_SECRET') || 'your-secret-key',
         signOptions: {
           expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ||
-            '7d') as any,
+            '24h') as any,
         },
       }),
       inject: [ConfigService],

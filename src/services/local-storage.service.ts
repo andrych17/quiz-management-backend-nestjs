@@ -70,7 +70,7 @@ export class LocalStorageService implements IStorageService {
       // Write file
       await fs.writeFile(filePath, fileBuffer);
 
-      this.logger.log(`File uploaded successfully: ${objectKey}`);
+      this.logger.log(`[local] File uploaded: ${objectKey} -> ${filePath}`);
 
       return {
         objectKey,
@@ -79,7 +79,7 @@ export class LocalStorageService implements IStorageService {
       };
     } catch (error) {
       this.logger.error(
-        `Failed to upload file to local storage: ${error.message}`,
+        `[local] Upload failed [file=${fileName}, prefix=${prefix}, basePath=${this.basePath}]: ${error.message}`,
         error.stack,
       );
       throw error;
@@ -98,7 +98,12 @@ export class LocalStorageService implements IStorageService {
       try {
         await fs.access(filePath);
       } catch {
-        throw new NotFoundException(`File not found: ${objectKey}`);
+        this.logger.warn(
+          `[local] File not found [key=${objectKey}, path=${filePath}, basePath=${this.basePath}]`,
+        );
+        throw new NotFoundException(
+          `[local] File not found: ${objectKey} (looked in: ${filePath})`,
+        );
       }
 
       // Read file
@@ -126,7 +131,7 @@ export class LocalStorageService implements IStorageService {
         throw error;
       }
       this.logger.error(
-        `Failed to get file from local storage: ${error.message}`,
+        `[local] getFile failed [key=${objectKey}, basePath=${this.basePath}]: ${error.message}`,
         error.stack,
       );
       throw error;
@@ -141,20 +146,22 @@ export class LocalStorageService implements IStorageService {
       try {
         await fs.access(filePath);
       } catch {
-        this.logger.warn(`File not found for deletion: ${objectKey}`);
+        this.logger.warn(
+          `[local] File not found for deletion (skipped) [key=${objectKey}, path=${filePath}]`,
+        );
         return; // File doesn't exist, nothing to delete
       }
 
       // Delete file
       await fs.unlink(filePath);
 
-      this.logger.log(`File deleted successfully: ${objectKey}`);
+      this.logger.log(`[local] File deleted: ${objectKey} (${filePath})`);
 
       // Optionally clean up empty directories
       await this.cleanupEmptyDirectories(path.dirname(filePath));
     } catch (error) {
       this.logger.error(
-        `Failed to delete file from local storage: ${error.message}`,
+        `[local] Delete failed [key=${objectKey}, basePath=${this.basePath}]: ${error.message}`,
         error.stack,
       );
       throw error;

@@ -64,7 +64,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
-    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '7d';
+    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '24h';
 
     return {
       access_token: accessToken,
@@ -105,7 +105,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
-    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '7d';
+    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '24h';
 
     return {
       access_token: accessToken,
@@ -137,7 +137,7 @@ export class AuthService {
 
       const accessToken = this.jwtService.sign(newPayload);
       const expiresIn =
-        this.configService.get<string>('JWT_EXPIRES_IN') || '7d';
+        this.configService.get<string>('JWT_EXPIRES_IN') || '24h';
 
       return {
         access_token: accessToken,

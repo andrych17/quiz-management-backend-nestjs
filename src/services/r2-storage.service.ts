@@ -97,7 +97,7 @@ export class R2StorageService implements IStorageService {
     fileSize: number;
   }> {
     if (!this.isEnabled) {
-      throw new Error('R2 Storage is disabled. Credentials not configured.');
+      throw new Error('[r2] Storage is disabled — R2 credentials (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY) not configured.');
     }
 
     try {
@@ -126,7 +126,7 @@ export class R2StorageService implements IStorageService {
         : undefined;
 
       this.logger.log(
-        `File uploaded to R2: ${objectKey} (Public: ${!!publicUrl})`,
+        `[r2] File uploaded [bucket=${this.bucketName}, key=${objectKey}, public=${!!publicUrl}]`,
       );
 
       return {
@@ -137,10 +137,10 @@ export class R2StorageService implements IStorageService {
       };
     } catch (error) {
       this.logger.error(
-        `Failed to upload file to R2: ${error.message}`,
+        `[r2] Upload failed [bucket=${this.bucketName}, file=${fileName}, prefix=${prefix}]: ${error.message}`,
         error.stack,
       );
-      throw new Error(`R2 upload failed: ${error.message}`);
+      throw new Error(`[r2] Upload failed [bucket=${this.bucketName}, file=${fileName}]: ${error.message}`);
     }
   }
 
@@ -153,7 +153,7 @@ export class R2StorageService implements IStorageService {
     contentLength: number;
   }> {
     if (!this.isEnabled) {
-      throw new Error('R2 Storage is disabled. Credentials not configured.');
+      throw new Error('[r2] Storage is disabled — R2 credentials (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY) not configured.');
     }
 
     try {
@@ -175,10 +175,12 @@ export class R2StorageService implements IStorageService {
       };
     } catch (error) {
       this.logger.error(
-        `Failed to get file from R2: ${error.message}`,
+        `Failed to get file from R2 [bucket=${this.bucketName}, key=${objectKey}]: ${error.message}`,
         error.stack,
       );
-      throw new Error(`R2 file retrieval failed: ${error.message}`);
+      // Re-throw original error so caller can inspect error.name and error.$metadata
+      // (e.g. NoSuchKey with $metadata.httpStatusCode 404)
+      throw error;
     }
   }
 
@@ -188,7 +190,7 @@ export class R2StorageService implements IStorageService {
   async deleteFile(objectKey: string): Promise<void> {
     if (!this.isEnabled) {
       this.logger.warn(
-        `Skipping delete for ${objectKey} because R2 is disabled.`,
+        `[r2] Skipping delete for key=${objectKey} — R2 credentials not configured.`,
       );
       return;
     }
@@ -200,10 +202,10 @@ export class R2StorageService implements IStorageService {
       });
 
       await this.s3Client.send(command);
-      this.logger.log(`File deleted successfully: ${objectKey}`);
+      this.logger.log(`[r2] File deleted [bucket=${this.bucketName}, key=${objectKey}]`);
     } catch (error) {
       this.logger.error(
-        `Failed to delete file from R2: ${error.message}`,
+        `[r2] Delete failed [bucket=${this.bucketName}, key=${objectKey}]: ${error.message}`,
         error.stack,
       );
       // Don't throw error, just log it - deletion failures shouldn't break the application
