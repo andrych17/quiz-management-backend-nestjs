@@ -24,6 +24,7 @@ import { UserQuizAssignmentController } from './controllers/user-quiz-assignment
 import { PublicController } from './controllers/public.controller';
 import { FileController } from './controllers/file.controller';
 import { DashboardController } from './controllers/dashboard.controller';
+import { VersionController } from './controllers/version.controller';
 
 // Services
 import { AppService } from './app.service';
@@ -82,6 +83,7 @@ import { databaseConfig } from './config/database.config';
     PublicController,
     FileController,
     DashboardController,
+    VersionController,
   ],
   providers: [
     AppService,
