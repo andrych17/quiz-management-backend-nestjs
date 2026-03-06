@@ -1494,6 +1494,11 @@ export class QuizService {
         isPublished: true, // Only published quizzes are accessible publicly
       },
       relations: ['questions', 'scoringTemplates'],
+      order: {
+        questions: {
+          order: 'ASC',
+        },
+      },
     });
 
     if (!quiz) {
