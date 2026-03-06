@@ -7,15 +7,16 @@ import {
   HttpStatus,
   BadRequestException,
   UseInterceptors,
-  UseGuards,
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiHeader } from '@nestjs/swagger';
 import { QuizService } from '../services/quiz.service';
 import { AttemptService } from '../services/attempt.service';
-import { ConfigService } from '../services/config.service';
+import { ConfigService as AppConfigService } from '../services/config.service';
 import { CreateAttemptDto } from '../dto/attempt.dto';
 import { QuizResponseDto } from '../dto/quiz.dto';
 import {
@@ -24,7 +25,6 @@ import {
 } from '../interfaces/api-response.interface';
 import { Idempotent } from '../decorators/idempotent.decorator';
 import { IdempotencyInterceptor } from '../interceptors/idempotency.interceptor';
-import { QuizSessionGuard } from '../auth/quiz-session-auth.guard';
 import { QuizSessionPayload } from '../auth/quiz-session.strategy';
 
 @ApiTags('public')
@@ -34,15 +34,67 @@ export class PublicController {
   constructor(
     private readonly quizService: QuizService,
     private readonly attemptService: AttemptService,
-    private readonly configService: ConfigService,
+    private readonly configService: AppConfigService,
+    private readonly jwtService: JwtService,
+    private readonly nestConfigService: ConfigService,
   ) {}
+
+  /**
+   * Validate x-session-token header against the submitted data.
+   * Only called when answers are present (actual submit, not start).
+   */
+  private validateQuizSessionToken(
+    req: Request,
+    email: string,
+    nij: string,
+    quizId: number,
+  ): void {
+    const rawToken = req.headers['x-session-token'] as string | undefined;
+    if (!rawToken) {
+      throw new UnauthorizedException(
+        'Header x-session-token diperlukan saat submit jawaban. ' +
+          'Pastikan Anda memulai quiz terlebih dahulu untuk mendapatkan session token.',
+      );
+    }
+
+    let payload: QuizSessionPayload;
+    try {
+      const secret =
+        this.nestConfigService.get<string>('QUIZ_SESSION_SECRET') ||
+        this.nestConfigService.get<string>('JWT_SECRET') ||
+        'your-secret-key';
+      payload = this.jwtService.verify<QuizSessionPayload>(rawToken, { secret });
+    } catch {
+      throw new UnauthorizedException(
+        'Session token tidak valid atau sudah kadaluarsa. ' +
+          'Silakan mulai ulang quiz untuk mendapatkan session baru.',
+      );
+    }
+
+    if (payload.type !== 'quiz-session') {
+      throw new UnauthorizedException('Tipe token tidak valid.');
+    }
+
+    if (payload.email !== email || payload.nij !== nij) {
+      throw new UnauthorizedException(
+        'Session token tidak cocok dengan data peserta yang di-submit. ' +
+          'Pastikan email dan NIJ sesuai dengan saat memulai quiz.',
+      );
+    }
+
+    if (payload.quizId !== quizId) {
+      throw new UnauthorizedException(
+        'Session token tidak sesuai dengan quiz ini. ' +
+          'Pastikan Anda mengakses quiz yang sama saat memulai.',
+      );
+    }
+  }
 
   /**
    * Extract actual quiz token from slug-token format
    * Handles both formats: "ABC123DEF456" or "test-ABC123DEF456"
    */
   private extractToken(input: string): string {
-    // If input contains a hyphen, assume it's slug-token format
     if (input.includes('-')) {
       const parts = input.split('-');
       // Return the last part as the token
@@ -276,19 +328,26 @@ export class PublicController {
   }
 
   @Post('quiz/:token/submit')
-  @UseGuards(QuizSessionGuard)
-  @ApiBearerAuth('quiz-session')
   @Idempotent(300) // Cache idempotent responses for 5 minutes
   @ApiOperation({
     summary: 'Submit jawaban quiz (tanpa autentikasi)',
     description:
-      'Endpoint untuk submit jawaban quiz secara publik. Memerlukan input NIJ, email, nama, dan jawaban. Supports idempotency for safe retries.',
+      'Endpoint untuk submit jawaban quiz secara publik. ' +
+      'Saat memulai quiz (answers kosong) server mengembalikan sessionToken. ' +
+      'Saat submit jawaban, kirim sessionToken via header x-session-token. ' +
+      'Supports idempotency for safe retries.',
   })
   @ApiParam({
     name: 'token',
     type: String,
     description: 'Token quiz untuk submit attempt',
     example: 'ABC123DEF456',
+  })
+  @ApiHeader({
+    name: 'x-session-token',
+    description:
+      'Session JWT yang diterima saat memulai quiz (wajib saat submit jawaban)',
+    required: false,
   })
   @ApiHeader({
     name: 'Idempotency-Key',
@@ -318,17 +377,6 @@ export class PublicController {
     @Param('token') token: string,
     @Body() submitData: CreateAttemptDto,
   ): Promise<StdApiResponse<any>> {
-    // Validate session token payload matches submission data
-    const session = req.user as QuizSessionPayload;
-    if (
-      session.email !== submitData.email ||
-      session.nij !== submitData.nij
-    ) {
-      throw new UnauthorizedException(
-        'Session token tidak cocok dengan data peserta yang di-submit. ' +
-          'Pastikan email dan NIJ sesuai dengan saat memulai quiz.',
-      );
-    }
     // Handle both formats: plain token (ABC123) or slug-token (test-ABC123)
     const actualToken = this.extractToken(token);
     // Verify quiz exists and is accessible
@@ -339,11 +387,14 @@ export class PublicController {
       );
     }
 
-    // Validate session token's quizId matches the quiz from the URL token
-    if (session.quizId !== quiz.id) {
-      throw new UnauthorizedException(
-        'Session token tidak sesuai dengan quiz ini. ' +
-          'Pastikan Anda mengakses quiz yang sama saat memulai.',
+    // Only validate session token when submitting actual answers (not on quiz start)
+    const hasAnswers = submitData.answers && submitData.answers.length > 0;
+    if (hasAnswers) {
+      this.validateQuizSessionToken(
+        req,
+        submitData.email,
+        submitData.nij,
+        quiz.id,
       );
     }
 

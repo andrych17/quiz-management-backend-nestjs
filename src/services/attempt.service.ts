@@ -24,7 +24,7 @@ import * as ExcelJS from 'exceljs';
 import { DebugLogger } from '../lib/debug-logger';
 import { toWIB, getAttemptStatus, getStatusLabel } from '../utils/datetime.util';
 import { retryAsync, isRetryableError } from '../lib/retry.util';
-import { calculateIQResult, getIQCategory, passedIQTest } from '../utils/iq-scoring.util';
+import { getIQCategory, passedIQTest } from '../utils/iq-scoring.util';
 import { QuizScoringMode } from '../entities/quiz.entity';
 import { QuizSessionService } from './quiz-session.service';
 
@@ -295,22 +295,17 @@ export class AttemptService {
               (template) => Number(template.correctAnswers) === Number(correctAnswers) && template.isActive !== false,
             );
 
-            let iqScore: number;
-            if (matchingTemplate) {
-              // Gunakan nilai dari DB (source of truth)
-              iqScore = Number(matchingTemplate.points);
-              DebugLogger.success('AttemptService', 'IQ Test: using DB scoring template', {
-                correctAnswers,
-                iqScore,
-              });
-            } else {
-              // Fallback ke hardcoded mapping
-              iqScore = calculateIQResult(correctAnswers).iqScore;
-              DebugLogger.warn('AttemptService', 'IQ Test: no DB template found, using hardcoded mapping', {
-                correctAnswers,
-                iqScore,
-              });
+            if (!matchingTemplate) {
+              throw new BadRequestException(
+                `Scoring template untuk ${correctAnswers} jawaban benar tidak ditemukan di database. Harap lengkapi tabel scoring IQ Test.`,
+              );
             }
+
+            const iqScore = Number(matchingTemplate.points);
+            DebugLogger.success('AttemptService', 'IQ Test: using DB scoring template', {
+              correctAnswers,
+              iqScore,
+            });
 
             const iqCategory = getIQCategory(iqScore);
             const iqPassed = passedIQTest(iqScore);
