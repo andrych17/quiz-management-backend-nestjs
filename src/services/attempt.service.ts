@@ -556,6 +556,8 @@ export class AttemptService {
     passStatus?: string,
     userId?: number,
     userRole?: string,
+    sortField?: string,
+    sortDirection?: string,
   ): Promise<Buffer> {
     DebugLogger.service('AttemptService', 'exportAttemptsToExcel', {
       quizId,
@@ -662,8 +664,23 @@ export class AttemptService {
       }
     }
 
+    const allowedExportSortFields: Record<string, string> = {
+      completedAt: 'attempt.completedAt',
+      submittedAt: 'attempt.submittedAt',
+      startedAt: 'attempt.startedAt',
+      participantName: 'attempt.participantName',
+      score: 'attempt.score',
+      passed: 'attempt.passed',
+      quizTitle: 'quiz.title',
+    };
+    const validExportSortField = (sortField && allowedExportSortFields[sortField])
+      ? allowedExportSortFields[sortField]
+      : 'attempt.completedAt';
+    const validExportSortDirection: 'ASC' | 'DESC' =
+      sortDirection === 'ASC' ? 'ASC' : 'DESC';
+
     const attempts = await queryBuilder
-      .orderBy('attempt.submittedAt', 'DESC')
+      .orderBy(validExportSortField, validExportSortDirection)
       .getMany();
 
     if (attempts.length === 0) {

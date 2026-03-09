@@ -195,6 +195,8 @@ export class AttemptController {
     @Query('locationKey') locationKey?: string,
     @Query('submissionStatus') submissionStatus?: string,
     @Query('passStatus') passStatus?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortDirection') sortDirection?: string,
     @Res() res?: Response,
   ) {
     DebugLogger.endpoint(
@@ -207,6 +209,8 @@ export class AttemptController {
         locationKey,
         submissionStatus,
         passStatus,
+        sortField,
+        sortDirection,
       },
     );
 
@@ -218,6 +222,8 @@ export class AttemptController {
       passStatus,
       user.id,
       user.role,
+      sortField,
+      sortDirection,
     );
 
     const filename = `quiz-attempts-${new Date().toISOString().split('T')[0]}.xlsx`;
