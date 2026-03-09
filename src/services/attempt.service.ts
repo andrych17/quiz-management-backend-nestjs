@@ -712,6 +712,13 @@ export class AttemptService {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Quiz Results');
 
+    const formatDT = (date: Date | string | null | undefined): string => {
+      if (!date) return '-';
+      const d = new Date(date);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+
     // Set column headers
     worksheet.columns = [
       { header: 'Participant Name', key: 'participantName', width: 25 },
@@ -724,7 +731,8 @@ export class AttemptService {
       { header: 'Total Questions', key: 'totalQuestions', width: 18 },
       { header: 'Submission Status', key: 'submissionStatus', width: 20 },
       { header: 'Pass Status', key: 'passStatus', width: 15 },
-      { header: 'Started At', key: 'startedAt', width: 20 },
+      { header: 'Started At', key: 'startedAt', width: 22 },
+      { header: 'Submitted At', key: 'submittedAt', width: 22 },
     ];
 
     // Style header row
@@ -756,9 +764,8 @@ export class AttemptService {
         totalQuestions: attempt.totalQuestions,
         submissionStatus: submissionStatus,
         passStatus: passStatus,
-        startedAt: attempt.startedAt
-          ? new Date(attempt.startedAt).toLocaleString('id-ID')
-          : '-',
+        startedAt: formatDT(attempt.startedAt),
+        submittedAt: formatDT(attempt.submittedAt),
       });
 
       // Conditional formatting for submission status
@@ -846,6 +853,7 @@ export class AttemptService {
     // Add title row
     worksheet.insertRow(1, [
       'Quiz Results Export',
+      '',
       '',
       '',
       '',
