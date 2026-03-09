@@ -73,7 +73,7 @@ async function bootstrap() {
       .setDescription(
         'Complete API documentation for Quiz Application with CRUD operations',
       )
-      .setVersion('1.4.0')
+      .setVersion('1.5.1')
       .addTag('auth', 'Authentication endpoints')
       .addTag('users', 'User management')
       .addTag('quizzes', 'Quiz management')

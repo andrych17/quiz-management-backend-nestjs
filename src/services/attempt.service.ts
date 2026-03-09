@@ -892,8 +892,26 @@ export class AttemptService {
     passStatus?: string,
     userId?: number,
     userRole?: string,
+    sortField?: string,
+    sortDirection?: string,
   ) {
     const skip = (page - 1) * limit;
+
+    // Validate sortField to prevent SQL injection
+    const allowedSortFields: Record<string, string> = {
+      completedAt: 'attempt.completedAt',
+      submittedAt: 'attempt.submittedAt',
+      startedAt: 'attempt.startedAt',
+      participantName: 'attempt.participantName',
+      score: 'attempt.score',
+      passed: 'attempt.passed',
+      quizTitle: 'quiz.title',
+    };
+    const validSortField = (sortField && allowedSortFields[sortField])
+      ? allowedSortFields[sortField]
+      : 'attempt.completedAt';
+    const validSortDirection: 'ASC' | 'DESC' =
+      sortDirection === 'ASC' ? 'ASC' : 'DESC';
 
     // Get user info for filtering (if admin, not superadmin)
     const user = userId ? await this.userRepository.findOne({ where: { id: userId } }) : null;
@@ -1028,7 +1046,7 @@ export class AttemptService {
 
     // Apply pagination and ordering
     const attempts = await queryBuilder
-      .orderBy('attempt.startedAt', 'DESC')
+      .orderBy(validSortField, validSortDirection)
       .skip(skip)
       .take(limit)
       .getMany();

@@ -86,6 +86,8 @@ export class AttemptController {
     @Query('endDate') endDate?: string,
     @Query('submissionStatus') submissionStatus?: string,
     @Query('passStatus') passStatus?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortDirection') sortDirection?: string,
   ) {
     DebugLogger.endpoint(
       'GET',
@@ -103,6 +105,8 @@ export class AttemptController {
         endDate,
         submissionStatus,
         passStatus,
+        sortField,
+        sortDirection,
       },
     );
     return this.attemptService.findAllWithFilter(
@@ -119,6 +123,8 @@ export class AttemptController {
       passStatus,
       user.id,
       user.role,
+      sortField,
+      sortDirection,
     );
   }
 
