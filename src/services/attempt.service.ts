@@ -558,6 +558,8 @@ export class AttemptService {
     userRole?: string,
     sortField?: string,
     sortDirection?: string,
+    quizName?: string,
+    search?: string,
   ): Promise<Buffer> {
     DebugLogger.service('AttemptService', 'exportAttemptsToExcel', {
       quizId,
@@ -614,6 +616,19 @@ export class AttemptService {
 
     if (quizId) {
       queryBuilder.andWhere('attempt.quizId = :quizId', { quizId });
+    }
+
+    if (quizName) {
+      queryBuilder.andWhere('UPPER(quiz.title) LIKE UPPER(:quizName)', {
+        quizName: `%${quizName}%`,
+      });
+    }
+
+    if (search) {
+      queryBuilder.andWhere(
+        '(UPPER(attempt.participantName) LIKE UPPER(:search) OR UPPER(attempt.email) LIKE UPPER(:search) OR UPPER(attempt.nij) LIKE UPPER(:search))',
+        { search: `%${search}%` },
+      );
     }
 
     if (

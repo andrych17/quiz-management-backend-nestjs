@@ -173,6 +173,18 @@ export class AttemptController {
     description: 'Filter by location',
   })
   @ApiQuery({
+    name: 'quizName',
+    required: false,
+    type: String,
+    description: 'Filter by quiz title (partial match)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by participant name, email, or NIJ',
+  })
+  @ApiQuery({
     name: 'submissionStatus',
     required: false,
     type: String,
@@ -193,6 +205,8 @@ export class AttemptController {
     @Query('quizId', new ParseIntPipe({ optional: true })) quizId?: number,
     @Query('serviceKey') serviceKey?: string,
     @Query('locationKey') locationKey?: string,
+    @Query('quizName') quizName?: string,
+    @Query('search') search?: string,
     @Query('submissionStatus') submissionStatus?: string,
     @Query('passStatus') passStatus?: string,
     @Query('sortField') sortField?: string,
@@ -207,6 +221,8 @@ export class AttemptController {
         quizId,
         serviceKey,
         locationKey,
+        quizName,
+        search,
         submissionStatus,
         passStatus,
         sortField,
@@ -224,6 +240,8 @@ export class AttemptController {
       user.role,
       sortField,
       sortDirection,
+      quizName,
+      search,
     );
 
     const filename = `quiz-attempts-${new Date().toISOString().split('T')[0]}.xlsx`;
