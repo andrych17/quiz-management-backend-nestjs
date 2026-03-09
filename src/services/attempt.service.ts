@@ -665,7 +665,6 @@ export class AttemptService {
     }
 
     const allowedExportSortFields: Record<string, string> = {
-      completedAt: 'attempt.completedAt',
       submittedAt: 'attempt.submittedAt',
       startedAt: 'attempt.startedAt',
       participantName: 'attempt.participantName',
@@ -675,7 +674,7 @@ export class AttemptService {
     };
     const validExportSortField = (sortField && allowedExportSortFields[sortField])
       ? allowedExportSortFields[sortField]
-      : 'attempt.completedAt';
+      : 'attempt.submittedAt';
     const validExportSortDirection: 'ASC' | 'DESC' =
       sortDirection === 'ASC' ? 'ASC' : 'DESC';
 
@@ -916,7 +915,6 @@ export class AttemptService {
 
     // Validate sortField to prevent SQL injection
     const allowedSortFields: Record<string, string> = {
-      completedAt: 'attempt.completedAt',
       submittedAt: 'attempt.submittedAt',
       startedAt: 'attempt.startedAt',
       participantName: 'attempt.participantName',
@@ -926,7 +924,7 @@ export class AttemptService {
     };
     const validSortField = (sortField && allowedSortFields[sortField])
       ? allowedSortFields[sortField]
-      : 'attempt.completedAt';
+      : 'attempt.submittedAt';
     const validSortDirection: 'ASC' | 'DESC' =
       sortDirection === 'ASC' ? 'ASC' : 'DESC';
 
