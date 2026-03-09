@@ -715,8 +715,10 @@ export class AttemptService {
     const formatDT = (date: Date | string | null | undefined): string => {
       if (!date) return '-';
       const d = new Date(date);
+      // Convert to WIB (UTC+7) to match frontend display
+      const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
       const pad = (n: number) => String(n).padStart(2, '0');
-      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      return `${pad(wib.getUTCDate())}/${pad(wib.getUTCMonth() + 1)}/${wib.getUTCFullYear()} ${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`;
     };
 
     // Set column headers
